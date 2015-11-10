@@ -1,1 +1,104 @@
-t
+void setup() {
+  
+  // Snelheden
+  int gewenste_snelheid
+  int snelheid_mps
+  int snelheid_rpm
+  int snelheid_pwm
+  
+  //Constanten
+  float omtrek_wiel = 0.115
+  int max_rpm = 100 
+  int max_pwm = 1024
+  
+  // Sensorwaarden
+  int snelheid_sensor 
+  int bots_sensor
+  int spanning_bots_voor 
+  int spanning_bots_achter
+  
+void loop() {
+  
+  meetSensoren()
+  
+  // Communicatie info uitlezen over snelheid (x) 
+  gewenste_snelheid = x 
+  // gewenste_snelheid eventueel omzetten naar meer bruikbare vorm
+  // Aflezen snelheidssensor 
+  // 0.115 m / rotatie 
+  // snelheid in m/s bekom je met 0.115 * (RPM / 60)
+  
+  /////////////////////////////////////////////////////////////////////
+  // !!!!! Formule nodig voor RPM -> PWM !!!!!                       //
+  // RPM tussen 0-?? (nog te meten) = x // PWM tussen 0-1024 = y     //
+  // Lineair verband                                                 //
+  // PWM = (xy/??) = (huidige_RPM * max_PWM) / max_RPM               // 
+  // Moet getest worden.                                             //
+  /////////////////////////////////////////////////////////////////////
+  // !!!!! Formule nodig voor Spanning -> RPM !!!!!                  //
+  // Spanning tussen 0-5V = x // RPM tussen 0-y (met y nog te meten) //
+  // Theoretisch lineair verband                                     //
+  // RPM = (xy/5) = (huidige_spanning * max_RPM) / 5                 //
+  // Moet getest worden.                                             //
+  /////////////////////////////////////////////////////////////////////
+  
+  if snelheid_sensor > gewenste_snelheid + 1.5 m/s {
+  snelheid_mps -- // verminderen met: sensor - gewenste_snelheid
+  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
+  analogWrite(snelheid_pwm)
+  }
+  else if snelheid_sensor < gewenste_snelheid - 1.5m/s {
+  snelheid_mps ++ // vergroten met: gewenste_snelheid - sensor
+  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
+  analogWrite(snelheid_pwm)
+  }
+  else if snelheid_sensor > gewenste_snelheid + 0.2m/s {
+  snelheid_mps -- // verminderen met: +- 0.1m/s 
+  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
+  analogWrite(snelheid_pwm)
+  }
+  else if snelheid_sensor < gewenste_snelheid - 0.2m/s {
+  snelheid_mps ++ // vergroten met: +- 0.1m/s 
+  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
+  analogWrite(snelheid_pwm)
+  }
+  
+  // Als we voor het LCD een schaal vaal 0.5m/s nemem, en bv 10m/s uitbeelden 
+  // met een snelheid tussen 9.6m/s en 10.4m/s dan zal de snelheid op het 
+  // LCD niet moeten veranderen elke keer we een kleine aanpassing doen. 
+ 
+}
+
+
+/// Hulpfunties
+
+meetSensoren(){
+  // Snelheidsensor 
+  snelheid_sensor = analogRead(pin)
+  snelheid_rpm = (snelheid_sensor * max_rpm) / 5 
+  snelheid_pwm = (snelheid_rpm * max_pwm) / max_rpm
+  snhelheid_mps = omtrek_wiel * (snelheid_rpm / 60) 
+  
+  // Botsingsensor 
+  bots_sensor = analogRead(pin)
+  if bots_sensor >= 4.5 {
+    botsing_voor = false 
+    botsing_achter = false   
+  }
+  else if bots_sensor < 4.5 {
+    if bots_sensor >= spanning_bots_voor {
+    botsing_voor = true
+    botsing_achter = false 
+    }
+    else if bots_sensor < spanning_bots_voor {
+      if bots_sensor >= spanning_bots_achter {
+      botsing_voor = false 
+      botsing_achter = true
+      }
+      else {
+      botsing_voor = true
+      botsing_achter = true 
+      }
+    }
+  }
+}
