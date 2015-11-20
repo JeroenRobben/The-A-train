@@ -1,66 +1,111 @@
-void setup() {
+#include <Wire.h>
+ 
+ //******Pin allocation************
+
+ //Sensors
+ byte PIN_SPEED = A3;
+ byte PIN_COLLISION = A4;
+
+ //Motor
+ byte PIN_MOTOR_2 = 9;
+ byte PIN_MOTOR_1 = 5;
+
+ //I2C Communication
+ byte PIN_SCA = 2;
+ byte PIN_SCL = 3;
+
+ //Emergency interrupts
+ byte PIN_EM_OUT = 0;
+ byte PIN_EM_IN = 7;
+
+ byte PIN_LCD = 1;
+
+ byte I2C_ADDRESS = 2;
+ 
+ //******Variables************
+
+ 
+  
+  // Terminals
+  byte terminal; // 0 = Nationaal Terminal, 1 = Internationaal Terminal
   
   // Snelheden
-  int gewenste_snelheid
-  int snelheid_mps
-  int snelheid_rpm
-  int snelheid_pwm
+  boolean richting = 0;   // 0 = vooruit, 1 = achteruit 
+  byte gewenste_snelheid;  // in mps
+  byte gewenste_snelheid_comm;  // 0-255
+  float snelheid_mps;
+  float snelheid_rpm;
+  float snelheid_pwm;
   
   //Constanten
-  float omtrek_wiel = 0.115
-  int max_rpm = 100 
-  int max_pwm = 1024
+  float OMTREK_WIEL = 0.115;
+  int MAX_RPM = 500; //// Aan te passen na meting !!!!!!!!!!! ////
+  int MAX_PWM = 1024;
+  float MAX_MPS = (0.115 * (MAX_RPM / 60));
+  int MAX_SPEED = 255;
   
   // Sensorwaarden
-  int snelheid_sensor 
-  int bots_sensor
-  int spanning_bots_voor 
-  int spanning_bots_achter
+  int snelheid_sensor_volt;
+  int bots_sensor;
+  boolean botsing_voor; 
+  boolean botsing_achter;
+  int spanning_bots_voor = 400;
+  int spanning_bots_achter = 220;
+  
+  boolean noodtoestand = 0;
+  
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Noodtoestand-interrupt ////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+void emergencySignal()
+{
+  if (digitalRead(PIN_EM_IN) == HIGH){
+    noodtoestand = 1;
+    digitalWrite(PIN_MOTOR_1, LOW);
+    digitalWrite(PIN_MOTOR_2, LOW);
+  }
+  else {
+    noodtoestand = 0;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void setup() {
+  pinMode(PIN_SPEED, INPUT);
+  pinMode(PIN_COLLISION, INPUT);
+  pinMode(PIN_EM_OUT, OUTPUT);
+
+  pinMode(PIN_EM_IN, INPUT);
+  pinMode(PIN_MOTOR_1, OUTPUT);
+  pinMode(PIN_MOTOR_2, OUTPUT);
+
+  Serial.begin(9600); //Communication with LCD
+
+//  // Communicatie
+//  Wire.begin(I2C_ADDRESS);      // join i2c bus with address #2
+//  Wire.onReceive(receiveEvent); // register event = Communicatie info uitlezen  
+//  
+  // Noodtoestand 
+  attachInterrupt(digitalPinToInterrupt(PIN_EM_IN), emergencySignal, CHANGE);
+}
   
 void loop() {
   
-  meetSensoren()
+  //gewenste_snelheid = commSpeedToMps(gewenste_snelheid_comm); // gewenste_snelheid_comm omzetten in m/s waarde. 
+  gewenste_snelheid = commSpeedToMps(128);
+  //Serial.print(gewenste_snelheid);
+  // Aflezen snelheidssensor
+  meetSensoren();
+  noodtoestandControle();
   
-  // Communicatie info uitlezen over snelheid (x) 
-  gewenste_snelheid = x 
-  // gewenste_snelheid eventueel omzetten naar meer bruikbare vorm
-  // Aflezen snelheidssensor 
-  // 0.115 m / rotatie 
-  // snelheid in m/s bekom je met 0.115 * (RPM / 60)
-  
-  /////////////////////////////////////////////////////////////////////
-  // !!!!! Formule nodig voor RPM -> PWM !!!!!                       //
-  // RPM tussen 0-?? (nog te meten) = x // PWM tussen 0-1024 = y     //
-  // Lineair verband                                                 //
-  // PWM = (xy/??) = (huidige_RPM * max_PWM) / max_RPM               // 
-  // Moet getest worden.                                             //
-  /////////////////////////////////////////////////////////////////////
-  // !!!!! Formule nodig voor Spanning -> RPM !!!!!                  //
-  // Spanning tussen 0-5V = x // RPM tussen 0-y (met y nog te meten) //
-  // Theoretisch lineair verband                                     //
-  // RPM = (xy/5) = (huidige_spanning * max_RPM) / 5                 //
-  // Moet getest worden.                                             //
-  /////////////////////////////////////////////////////////////////////
-  
-  if snelheid_sensor > gewenste_snelheid + 1.5 m/s {
-  snelheid_mps -- // verminderen met: sensor - gewenste_snelheid
-  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
-  analogWrite(snelheid_pwm)
-  }
-  else if snelheid_sensor < gewenste_snelheid - 1.5m/s {
-  snelheid_mps ++ // vergroten met: gewenste_snelheid - sensor
-  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
-  analogWrite(snelheid_pwm)
-  }
-  else if snelheid_sensor > gewenste_snelheid + 0.2m/s {
-  snelheid_mps -- // verminderen met: +- 0.1m/s 
-  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
-  analogWrite(snelheid_pwm)
-  }
-  else if snelheid_sensor < gewenste_snelheid - 0.2m/s {
-  snelheid_mps ++ // vergroten met: +- 0.1m/s 
-  // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
-  analogWrite(snelheid_pwm)
+  Serial.println(noodtoestand);
+  delay(1000);
+  if (noodtoestand == 0){
+    snelheidAanpassen(snelheid_mps, gewenste_snelheid);
   }
   
   // Als we voor het LCD een schaal vaal 0.5m/s nemem, en bv 10m/s uitbeelden 
@@ -69,36 +114,193 @@ void loop() {
  
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Hulpfunties ///////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  
+  ///////////////////////////////////////////////////////////////////////
+  // snelheid in m/s bekom je met 0.115 * (RPM / 60)                   //
+  ///////////////////////////////////////////////////////////////////////
+  // Formule SPEED -> mps                                              //
+  // SPEED tussen 0-255 = x // mps tussen 0-1 mps en y = 1             //
+  // Lineair verband                                                   //
+  // mps = (xy/255) = (huidige_SPEED * max_mps) / max_SPEED            //
+  ///////////////////////////////////////////////////////////////////////
+  // !!!!! Formule nodig voor RPM -> PWM !!!!!                         //
+  // RPM tussen 0-?? (nog te meten) = x // PWM tussen 0-1024 en y=1024 //
+  // Lineair verband                                                   //
+  // PWM = (xy/??) = (huidige_RPM * max_PWM) / max_RPM                 // 
+  // Moet getest worden.                                               //
+  ///////////////////////////////////////////////////////////////////////
+  // !!!!! Formule nodig voor Spanning -> RPM !!!!!                    //
+  // Spanning tussen 0-5V = x // RPM tussen 0-y (met y nog te meten)   //
+  // Theoretisch lineair verband                                       //
+  // RPM = (xy/5) = (huidige_spanning * max_RPM) / 5                   //
+  // Moet getest worden.                                               //
+  ///////////////////////////////////////////////////////////////////////
 
-/// Hulpfunties
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Sensoren //////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-meetSensoren(){
+int meetSensoren(){
   // Snelheidsensor 
-  snelheid_sensor = analogRead(pin)
-  snelheid_rpm = (snelheid_sensor * max_rpm) / 5 
-  snelheid_pwm = (snelheid_rpm * max_pwm) / max_rpm
-  snhelheid_mps = omtrek_wiel * (snelheid_rpm / 60) 
+  snelheid_sensor_volt = analogRead(PIN_SPEED);
+  snelheid_rpm = (snelheid_sensor_volt * MAX_RPM) / 5 ;
+  snelheid_pwm = (snelheid_rpm * MAX_PWM) / MAX_RPM;
+  snelheid_mps = OMTREK_WIEL * (snelheid_rpm / 60) ;
   
   // Botsingsensor 
-  bots_sensor = analogRead(pin)
-  if bots_sensor >= 4.5 {
-    botsing_voor = false 
-    botsing_achter = false   
+  bots_sensor = analogRead(PIN_COLLISION);
+  if (bots_sensor >= 1000) {
+    botsing_voor = false;
+    botsing_achter = false;
   }
-  else if bots_sensor < 4.5 {
-    if bots_sensor >= spanning_bots_voor {
-    botsing_voor = true
-    botsing_achter = false 
+  
+  else if (bots_sensor < 1000 )
+  {
+    if (bots_sensor >= spanning_bots_voor) {
+    botsing_voor = true ;
+    botsing_achter = false ;
     }
-    else if bots_sensor < spanning_bots_voor {
-      if bots_sensor >= spanning_bots_achter {
-      botsing_voor = false 
-      botsing_achter = true
+    
+    else if (bots_sensor < spanning_bots_voor) {
+      
+      if (bots_sensor >= spanning_bots_achter) {
+      botsing_voor = false ;
+      botsing_achter = true ;
       }
+      
       else {
-      botsing_voor = true
-      botsing_achter = true 
+      botsing_voor = true ;
+      botsing_achter = true ;
       }
     }
+  }
+  return snelheid_rpm && snelheid_mps && snelheid_pwm && botsing_voor && botsing_achter ;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Noodtoestand Controle /////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void noodtoestandControle(){
+  
+  if ((botsing_voor == true) && (botsing_achter == false) && (richting == 0)){
+    Serial.println("A");
+    noodtoestand = 1;
+    analogWrite(PIN_MOTOR_1, 0);
+    digitalWrite(PIN_EM_OUT, HIGH);
+  }
+  else if ((botsing_voor == false) && (botsing_achter == true) && (richting == 1)){
+    Serial.println("B");
+    noodtoestand = 1;
+    analogWrite(PIN_MOTOR_2, 0);
+    digitalWrite(PIN_EM_OUT, HIGH);
+  }
+  else if ((botsing_voor == true) && (botsing_achter == true)){
+    noodtoestand = 1;
+    analogWrite(PIN_MOTOR_1, 0);
+    analogWrite(PIN_MOTOR_2, 0);
+    digitalWrite(PIN_EM_OUT, HIGH);
+  }
+  else if ((botsing_voor == false) && (botsing_achter == false)){
+    noodtoestand = 0;
+    digitalWrite(PIN_EM_OUT, LOW); 
+  }
+}  
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Eenheden omzetten /////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int mpsToPwm(int snelheid_mps){
+  
+  snelheid_rpm = (snelheid_mps*60)/OMTREK_WIEL ;
+  return snelheid_pwm = (snelheid_rpm*MAX_PWM)/MAX_RPM ;
+}
+
+int commSpeedToMps(byte gewenste_snelheid_comm) {
+ 
+  snelheid_mps = (gewenste_snelheid_comm * MAX_MPS) / MAX_SPEED ;
+  Serial.println(snelheid_mps);
+  return snelheid_mps ;  
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///Snelheid aanpassen//////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void snelheidAanpassen(int snelheid_mps, int gewenste_snelheid) {
+  
+  if (gewenste_snelheid == 0){
+    analogWrite(PIN_MOTOR_1, 0) ; 
+    analogWrite(PIN_MOTOR_2, 0) ;
+  }
+  
+  else if ((snelheid_mps > (gewenste_snelheid - 0.2)) && (snelheid_mps < (gewenste_snelheid + 0.2)))
+  {
+  }
+  
+  else if (snelheid_mps > gewenste_snelheid + 0.1) // In m/s  
+  {
+    snelheid_mps = gewenste_snelheid ; // Onmiddelijk veranderen naar gewenste_snelheid
+    snelheid_sturen(snelheid_mps) ;
+  }
+  
+  else if (snelheid_mps < gewenste_snelheid - 0.1) 
+  {
+    snelheid_mps = gewenste_snelheid ; // Onmiddelijk veranderen naar gewenste_snelheid
+    snelheid_sturen(snelheid_mps) ;
+  }
+  
+  else if (snelheid_mps > gewenste_snelheid + 0.05) 
+  {
+    snelheid_mps = snelheid_mps - 0.025 ;// verminderen met: +- 0.1m/s 
+    snelheid_sturen(snelheid_mps) ;
+  }
+  
+  else if (snelheid_mps < gewenste_snelheid - 0.05) 
+  {
+    snelheid_mps = snelheid_mps - 0.025 ;// verminderen met: +- 0.1m/s 
+    snelheid_sturen(snelheid_mps) ;
+  }
+} 
+ 
+void snelheid_sturen(int snelheid_mps){
+  snelheid_pwm = mpsToPwm(snelheid_mps) ; // snelheid_mps omzetten in pmw singaal en snelheid_pwm naar de motor sturen
+  if (richting == 0) {    
+  analogWrite(PIN_MOTOR_1, snelheid_pwm) ;
+  }
+  else {
+  analogWrite(PIN_MOTOR_2, snelheid_pwm) ;
   }
 }
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ ///Communicatie////////////////////////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+// void receiveEvent(int howMany){
+//   if (Wire.available() == 3) {
+//     richting = Wire.read();
+//     gewenste_snelheid_comm = Wire.read();
+//     terminal = Wire.read();
+//   }
+//   else if (Wire.available() == 2) {
+//     richting = Wire.read();
+//     gewenste_snelheid_comm = Wire.read();
+//   }
+// }
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+   
+  
+  
+  
+  
+  
+  
+  
