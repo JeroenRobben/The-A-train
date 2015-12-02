@@ -1,0 +1,150 @@
+# NOTE: VPython and numpy must be installed on your pc
+
+from visual import *
+
+# ----------- Track design ---------------------------------------------------------------------------------------------
+RADIUS = 110.           # radius in cm
+STRAIGHT = 150.         # straight track length in cm
+TERMINAL_LENGTH = 120.  # length of the track between the switch and terminal in cm
+TERMINAL_RICO = 0.5     # rico of the track between the switch and terminal in cm
+
+myScene = display(title='The A Train')
+myScene.width = 800
+myScene.height = 500
+
+
+floor = box(pos=(0, -5, -30), length=500, width=350, height=10, color=color.white)
+
+q1 = arange(0, pi*RADIUS/2, 1.)
+q2 = q1 + pi*RADIUS/2
+q3 = q1 + pi*RADIUS
+q4 = q1 + pi*RADIUS*3/2
+
+d1 = arange(0, TERMINAL_LENGTH, 1.)
+d2 = -d1
+
+ArrayXRightLowerCurve = RADIUS*cos(q1/RADIUS) + STRAIGHT/2
+ArrayZRightLowerCurve = RADIUS*sin(q1/RADIUS) - 50
+ArrayXLeftLowerCurve = RADIUS*cos(q2/RADIUS) - STRAIGHT/2
+ArrayZLeftLowerCurve = RADIUS*sin(q2/RADIUS) - 50
+ArrayXLeftUpperCurve = RADIUS*cos(q3/RADIUS) - STRAIGHT/2
+ArrayZLeftUpperCurve = RADIUS*sin(q3/RADIUS) - 50
+ArrayXRightUpperCurve = RADIUS*cos(q4/RADIUS) + STRAIGHT/2
+ArrayZRightUpperCurve = RADIUS*sin(q4/RADIUS) - 50
+
+ArrayXUpperStraight = arange(-STRAIGHT/2, STRAIGHT/2, 1.)
+ArrayZUpperStraight = zeros(len(ArrayXUpperStraight))-RADIUS - 50
+ArrayXLowerStraight = -ArrayXUpperStraight
+ArrayZLowerStraight = zeros(len(ArrayXLowerStraight))+RADIUS - 50
+
+ArrayXRightTerminal = d1/(sqrt(1.+TERMINAL_RICO**2)) + STRAIGHT/2
+ArrayZRightTerminal = TERMINAL_RICO*d1/(sqrt(1.+TERMINAL_RICO**2)) + RADIUS - 50
+
+ArrayXLeftTerminal = -d1/(sqrt(1.+TERMINAL_RICO**2)) - STRAIGHT/2
+ArrayZLeftTerminal = -TERMINAL_RICO*(-d1/(sqrt(1.+TERMINAL_RICO**2))) + RADIUS - 50
+
+ArrayXCurve = append(ArrayXRightLowerCurve, ArrayXLowerStraight)
+ArrayXCurve = append(ArrayXCurve, ArrayXLeftLowerCurve)
+ArrayXCurve = append(ArrayXCurve, ArrayXLeftUpperCurve)
+ArrayXCurve = append(ArrayXCurve, ArrayXUpperStraight)
+ArrayXCurve = append(ArrayXCurve, ArrayXRightUpperCurve)
+
+ArrayZCurve = append(ArrayZRightLowerCurve, ArrayZLowerStraight)
+ArrayZCurve = append(ArrayZCurve, ArrayZLeftLowerCurve)
+ArrayZCurve = append(ArrayZCurve, ArrayZLeftUpperCurve)
+ArrayZCurve = append(ArrayZCurve, ArrayZUpperStraight)
+ArrayZCurve = append(ArrayZCurve, ArrayZRightUpperCurve)
+
+Ellipse = curve(x=ArrayXCurve, y=0, z=ArrayZCurve, color=color.red, radius=1.)
+
+RightTerminal = curve(x=ArrayXRightTerminal, y=0, z=ArrayZRightTerminal, color=color.red, radius=1.)
+LeftTerminal = curve(x=ArrayXLeftTerminal, y=0, z=ArrayZLeftTerminal, color=color.red, radius=1.)
+
+Origin = sphere(radius=2., color=color.blue, pos=(0, 0, 0))
+
+SwitchLeft = sphere(radius=2., color=color.black, pos=(-STRAIGHT/2, 0, RADIUS-50))
+SwitchLeft.Index = int(where(ArrayXCurve == -STRAIGHT/2)[0][0])
+SwitchRight = sphere(radius=2., color=color.black, pos=(STRAIGHT/2, 0, RADIUS-50))
+SwitchRight.Index = int(where(ArrayXCurve == STRAIGHT/2)[0][0])
+
+
+Train = sphere(radius=5., color=color.green, pos=(0, 0, 0))
+
+# ----------- Motion design --------------------------------------------------------------------------------------------
+FRAMERATE = 25              # frames per second
+Direction = 1              # 1=clockwise,  -1=counterclockwise
+Speed = 40.                 # in cm/s
+Location = "Ellipse"        # can be "Ellipse", "LeftTerminal" or "RightTerminal"
+SwitchLeft.Status = 1       # 0=off, 1=on, 2=unknown
+SwitchRight.Status = 1      # 0=off, 1=on, 2=unknown
+
+print ArrayXRightTerminal
+
+LocationIndex = 0
+
+while True:
+    rate(FRAMERATE)
+    cmPerFrame = Speed/FRAMERATE
+
+    PreviousLocationIndex = LocationIndex
+    LocationIndex += Direction*cmPerFrame
+
+    # End of ellipse fix:
+    if Location == "Ellipse" and LocationIndex >= len(ArrayXCurve):
+        LocationIndex = 0.
+    if Location == "Ellipse" and LocationIndex < 0:
+        LocationIndex = len(ArrayXCurve) - 1.
+
+    # End of left terminal fix:
+    if Location == "LeftTerminal" and LocationIndex >= len(ArrayXLeftTerminal):
+        Direction *= -1
+        LocationIndex = len(ArrayXLeftTerminal) - 1
+
+    # Start of left terminal fix:
+    if Location == "LeftTerminal" and LocationIndex < 0:
+        Location = "Ellipse"
+        LocationIndex += SwitchLeft.Index
+
+    # Left switch:
+    if Location == "Ellipse" and Direction == 1 \
+            and PreviousLocationIndex <= SwitchLeft.Index < LocationIndex \
+            and SwitchLeft.Status == 1:
+        Location = "LeftTerminal"
+        LocationIndex -= SwitchLeft.Index
+
+    # End of right terminal fix:
+    if Location == "RightTerminal" and LocationIndex >= len(ArrayXRightTerminal):
+        Direction *= -1
+        LocationIndex = len(ArrayXRightTerminal) - 1
+
+    # Start of right terminal fix:
+    if Location == "RightTerminal" and LocationIndex < 0:
+        Location = "Ellipse"
+        LocationIndex = SwitchRight.Index - LocationIndex
+        Direction = 1
+
+    # Right Switch:
+    if Location == "Ellipse" and Direction == -1 \
+            and PreviousLocationIndex >= SwitchRight.Index > LocationIndex \
+            and SwitchRight.Status == 1:
+        Location = "RightTerminal"
+        LocationIndex = SwitchRight.Index - LocationIndex
+        Direction = 1
+
+
+
+
+    if Location == "Ellipse":
+        xPos = ArrayXCurve[int(LocationIndex)]
+        zPos = ArrayZCurve[int(LocationIndex)]
+
+    elif Location == "LeftTerminal":
+        xPos = ArrayXLeftTerminal[int(LocationIndex)]
+        zPos = ArrayZLeftTerminal[int(LocationIndex)]
+
+    elif Location == "RightTerminal":
+        xPos = ArrayXRightTerminal[int(LocationIndex)]
+        zPos = ArrayZRightTerminal[int(LocationIndex)]
+
+    Train.pos = (xPos, 0, zPos)
+
