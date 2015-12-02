@@ -22,6 +22,8 @@
   SOFTWARE.
 */ 
 
+boolean TURN_OFF_EMERGENCY = true;
+
 #include <Wire.h>                                      // include library for I2C communication.
 #include "VirtualWireWithoutPTT.h"                     // include library for radio communication.
 
@@ -70,7 +72,7 @@ float terminal_international_waiting_time = 40000;     // time in milliseconds. 
 unsigned long arrival_time;                            // time in milliseconds since Arduino startup. The time when the train stops at the terminal.
 unsigned long doors_opening_time;                      // time in milliseconds since Arduino startup. The time when the doors open in the terminal.
 unsigned long doors_closing_time;                      // time in milliseconds since Arduino startup. The time when the doors close in the terminal.
-unsigned long departure_time;                          // time in milliseconds since Arduino startup. The time of departure.
+unsigned long departure_time = 0;                          // time in milliseconds since Arduino startup. The time of departure.
 unsigned long current_time;                            // time in milliseconds since Arduino startup. The time measured at that moment.
 unsigned long next_transmission_time;                  // time in milliseconds since Arduino startup. The time for the next radio transmission.
 boolean doors_opened = false;
@@ -124,7 +126,7 @@ void setup() {
   
   vw_set_tx_pin(TRANSMIT_PIN);                       // set virtual wire for RF communication
   vw_set_rx_pin(RECEIVE_PIN);
-  vw_setup(2000);	                                   // Bits per sec
+  vw_setup(2000);	                             // Bits per sec
   vw_rx_start();                                     // Start the receiver PLL running
   
   pinMode(PIN_IR_DECODER_VT, INPUT);
@@ -134,6 +136,17 @@ void setup() {
   pinMode(PIN_IR_DECODER_D4, INPUT);
   pinMode(PIN_EMERGENCY_MOTOR, INPUT);
   pinMode(PIN_EMERGENCY_COMMUNICATION, OUTPUT);
+  
+  pinMode(A1, INPUT);                           // declaring unused pins as input.
+  pinMode(A2, INPUT);
+  pinMode(A3, INPUT);
+  pinMode(A4, INPUT);
+  pinMode(A5, INPUT);
+  pinMode(4, INPUT);
+  pinMode(5, INPUT);
+  pinMode(6, INPUT);
+  pinMode(9, INPUT);
+  
   
   current_location = STRAIGHT_TRACK;                 // start position and direction. Temporary solution since there is no initialisation message yet.
   track_speed_direction = FORWARD;
@@ -210,6 +223,9 @@ void loop() {
 // ============================================================================
 // Interrupt functions must be as fast as possible.
 void emergency_interrupt() {                                   // when the emergency line from motor goes changes: 
+  if (TURN_OFF_EMERGENCY) {
+    return;
+    }
   bool emergency_motor = digitalRead(PIN_EMERGENCY_MOTOR);
   
   switch (emergency_motor) {
@@ -312,7 +328,7 @@ void terminal_function() {                             // timing control in the 
   if ((departure_time > arrival_time) && (current_time > departure_time) && (doors_opened == false)) {               
     Serial.println("Departure");
     location_change = true;
-    current_location == TERMINAL_DEPARTURE;
+    current_location = TERMINAL_DEPARTURE;
     }
   // If door_closing_time is already updated and exceeded and the doors are still open: close doors.
   else if ((doors_closing_time > arrival_time) && (current_time > doors_closing_time) && (doors_opened == true)) {    
@@ -322,7 +338,7 @@ void terminal_function() {                             // timing control in the 
     departure_time = current_time + TIME_TO_CLOSE_DOORS;  // and update departure_time.
     }
   // If the doors_opening_time is exceeded and the doors are still closed: open doors.
-  else if (current_time > doors_opening_time && doors_opened == false) {                 
+  else if (departure_time < arrival_time && current_time > doors_opening_time && doors_opened == false) {                 
     Serial.println("Open doors");
     send_comfort_open_doors();
     doors_opened = true;
