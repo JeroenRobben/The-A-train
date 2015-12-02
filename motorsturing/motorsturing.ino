@@ -1,7 +1,5 @@
-.
-.#include <Wire.h>
-//#include "P&O3.h" //comment this line for development in arduino IDE
-#include <SoftwareSerial.h> //Communication with LCD
+#include <Wire.h>
+//#include "P&O3.h" 					//comment this line for development in arduino IDE
 
 /*
 MMMMMMMM               MMMMMMMM     OOOOOOOOO     TTTTTTTTTTTTTTTTTTTTTTT     OOOOOOOOO     RRRRRRRRRRRRRRRRR
@@ -43,9 +41,8 @@ const byte I2C_ADDRESS = 2;
 const byte PIN_EM_OUT = 0;
 const byte PIN_EM_IN = 7;
 
-//LCD
+//Serial1
 const byte PIN_LCD = 1;
-SoftwareSerial lcd (4, PIN_LCD);
  	 	 	 	 	 	 	//Unused Pins, will be flagged as INPUT
 const byte UNUSED_PINS[] = {A0, A1, A2, A5, 4, 6, 8, 10, 11, 12, 13};
 const byte AMOUNT_UNUSED_PINS = 11;			//needed to loop through the above array
@@ -266,36 +263,36 @@ void emergency_local_check(){
 
 //LCD
 void setBacklight(byte brightness){
-	lcd.write(0x80);  				//send the backlight command
-	lcd.write(brightness);  			//send the brightness value
+	Serial1.write(0x80);  				//send the backlight command
+	Serial1.write(brightness);  			//send the brightness value
 }
 
 void clearDisplay(){
-	lcd.write(0xFE);  				//send the special command
-	lcd.write(0x01);  				//send the clear screen command
+	Serial1.write(0xFE);  				//send the special command
+	Serial1.write(0x01);  				//send the clear screen command
 }
 
 void setlcdCursor(byte cursor_position){
-	lcd.write(0xFE);  				//send the special command
-	lcd.write(0x80);  				//send the set cursor command
-	lcd.write(cursor_position);  		//send the cursor position
+	Serial1.write(0xFE);  				//send the special command
+	Serial1.write(0x80);  				//send the set cursor command
+	Serial1.write(cursor_position);  		//send the cursor position
 }
 
 void update_lcd(){
 	clearDisplay();
-	lcd.print("SPEED ");
-	lcd.print(speed_COMM_raw);
+	Serial1.print("SPEED ");
+	Serial1.print(speed_COMM_raw);
 	setlcdCursor(10);
-	lcd.print(speed_pwm);
-	//lcd.print("m/s");
+	Serial1.print(speed_pwm);
+	//Serial1.print("m/s");
 	setlcdCursor(16);
-	lcd.print(emergency_COMM);
-	lcd.print(" ");
-	lcd.print(emergency_local);
-	lcd.print(" ");
-	lcd.print(speed_COMM_sens);
-	lcd.print(" ");
-	lcd.print(speed_raw);
+	Serial1.print(emergency_COMM);
+	Serial1.print(" ");
+	Serial1.print(emergency_local);
+	Serial1.print(" ");
+	Serial1.print(speed_COMM_sens);
+	Serial1.print(" ");
+	Serial1.print(speed_raw);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// I2C & INTERRUPT FUNCTIONS///////////////////////////////////////////
@@ -317,9 +314,9 @@ void i2c_receive(int bytes_received){
 	}
 
 
-   if (speed_COMM_raw == 0){
-	   direction = 2;
-   }
+   	if (speed_COMM_raw == 0){
+	   	direction = 2;
+   	}
  }
 
 
@@ -367,11 +364,11 @@ void setup() {
 	//Attach emergency interrupt (emergency from COMM)
 	//attachInterrupt(digitalPinToInterrupt(PIN_EM_IN), emergency_COMM_isr, RISING);
 
-	lcd.begin(1200); 				//Communication with LCD
+	Serial1.begin(1200); 				//Communication with Serial1
 
 	delay(2000);					//Boot time
 
-	setBacklight(255);				//LCD on
+	setBacklight(255);				//Serial1 on
 	clearDisplay();
 
 }
@@ -386,7 +383,7 @@ void loop() {
 	emergency_local_check();
 
 	if ((emergency_local <= 2) && (emergency_COMM == false)){
-		speed_pwm = speed_COMM_raw; 		//testing purposes
+		//speed_pwm = speed_COMM_raw; 		//testing purposes
 		speed_calc();
 		speed_send();
 	}
