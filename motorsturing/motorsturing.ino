@@ -1,4 +1,5 @@
-#include <Wire.h>
+.
+.#include <Wire.h>
 //#include "P&O3.h" //comment this line for development in arduino IDE
 #include <SoftwareSerial.h> //Communication with LCD
 
@@ -56,10 +57,10 @@ byte terminal = 0;					//0 = No Terminal, 1 = International Terminal, 2 = Nation
 
 
 //ENGINE AND SPEED CONTROL
-volatile byte direction = 2;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
-volatile int speed_COMM_raw = 0;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
-int speed_COMM_sens = 0; 				//speed sensor value to be approached, calculated from speed_COMM_raw
-byte speed_pwm = 0; 					//speed directly written to engine - PWM - 0-255
+volatile byte direction = 1;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
+volatile int speed_COMM_raw = 180;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
+int speed_COMM_sens = 700; 				//speed sensor value to be approached, calculated from speed_COMM_raw
+byte speed_pwm = 100; 					//speed directly written to engine - PWM - 0-255
 
 //SENSORS
 
@@ -72,7 +73,7 @@ bool collision_front = false;
 bool collision_back = false;
 
 
-const int BOTS_REF[] = {1000, 400, 220};		/*
+const int BOTS_REF[] = {950, 390, 200};		/*
 							measured value between 1023 - BOTS_REF[0]		=> none of the sensors detecting object
 							measured value between BOTS_REF[0] - BOTS_REF[1] 	=> only front sensor detects object
 							measured value between BOTS_REF[1] - BOTS_REF[2] 	=> only back sensor detects object
@@ -200,12 +201,12 @@ void speed_calc() {					//Calculate desired speed written to engines
 	}
 
 							//decrease speed
-	else if ((speed_COMM_sens > speed_raw) && speed_pwm > 0){
-		speed_pwm--;
+	else if ((speed_COMM_sens > speed_raw) && (speed_pwm > 0)){
+		speed_pwm += 1;
 	}
 							//increase speed
-	else if ((speed_COMM_sens < speed_raw) && speed_pwm < 255){
-		speed_pwm++;
+	else if ((speed_COMM_sens < speed_raw) && (speed_pwm < 255)){
+		speed_pwm -= 1;
 	}
 }
 
@@ -285,11 +286,16 @@ void update_lcd(){
 	lcd.print("SPEED ");
 	lcd.print(speed_COMM_raw);
 	setlcdCursor(10);
-	lcd.write("m/s");
+	lcd.print(speed_pwm);
+	//lcd.print("m/s");
 	setlcdCursor(16);
 	lcd.print(emergency_COMM);
 	lcd.print(" ");
 	lcd.print(emergency_local);
+	lcd.print(" ");
+	lcd.print(speed_COMM_sens);
+	lcd.print(" ");
+	lcd.print(speed_raw);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// I2C & INTERRUPT FUNCTIONS///////////////////////////////////////////
@@ -342,10 +348,10 @@ void setup() {
 
 	pinMode(PIN_EM_OUT, OUTPUT);
 	pinMode(PIN_EM_IN, INPUT);
+	digitalWrite(PIN_EM_OUT, LOW);
 
 	pinMode(PIN_MOTOR_V, OUTPUT);
 	pinMode(PIN_MOTOR_A, OUTPUT);
-
 
 	digitalWrite(PIN_MOTOR_V, LOW); 		//make sure engines are off
 	digitalWrite(PIN_MOTOR_A, LOW);
@@ -379,14 +385,14 @@ void loop() {
 	update_sensors();
 	emergency_local_check();
 
-	if ((emergency_local <= 2) && (emergency_COMM = false)){
-		//speed_pwm = speed_COMM_raw; 		//testing purposes
+	if ((emergency_local <= 2) && (emergency_COMM == false)){
+		speed_pwm = speed_COMM_raw; 		//testing purposes
 		speed_calc();
 		speed_send();
 	}
 
 	update_lcd();
-	delay(10);
+	delay(5);
 /*							//stay in loop while COMM is in emergency mode
 	while((emergency_COMM == true) || (digitalRead(PIN_EM_IN) == HIGH)){
 
