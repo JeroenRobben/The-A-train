@@ -57,11 +57,11 @@ if (vw_have_message()){
         TrainDirection=buf[4];
         //print incoming message for use interface
         Serial.print(baken);
-        Serial.print("_,_");
+        Serial.print(" , ");
         Serial.print(current_status);
-        Serial.print("_,_");
+        Serial.print(" , ");
         Serial.print(TrainSpeed);
-        Serial.print("_,_");
+        Serial.print(" , ");
         Serial.println(TrainDirection);
        
    uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status};
