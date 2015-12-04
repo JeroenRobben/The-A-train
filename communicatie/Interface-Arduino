@@ -18,7 +18,9 @@ int RECEIVE_PIN =13;
 int CCE_speed;
 byte current_status = 1;                            //variable die zegt of we sturen of niet
 byte send_status = 0;
-
+int TrainSpeed;
+int baken;
+byte TrainDirection;
 
 // RF adresses:
 int CCE_ADRESS = 0;
@@ -27,7 +29,6 @@ int COMM_ADRESS = 1;
 void setup()
 {
     Serial.begin(9600);	// Debugging only
-    Serial.println("setup");
     
     vw_set_tx_pin(TRANSMIT_PIN);                                                               // set virtual wire for RF communication
     vw_set_rx_pin(RECEIVE_PIN);
@@ -50,22 +51,23 @@ if (vw_have_message()){
   if (vw_get_message(buf, &buflen)) // Non-blocking
     {
       if (buf[0] == COMM_ADRESS){
-        
-           int i;
-
-  // Message with a good checksum received, dump it.
-  Serial.print("Got: ");
-  
-  for (i = 0; i < buflen; i++)
-  {
-      Serial.print(buf[i], HEX);
-      Serial.print(" ");
-  }
-  Serial.println("");
+        baken=buf[1];
+        current_status=buf[2];
+        TrainSpeed=buf[3];
+        TrainDirection=buf[4];
+        //print incoming message for use interface
+        Serial.print(baken);
+        Serial.print("_,_");
+        Serial.print(current_status);
+        Serial.print("_,_");
+        Serial.print(TrainSpeed);
+        Serial.print("_,_");
+        Serial.println(TrainDirection);
+       
    uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status};
         if (send_status==1){
     vw_send(msg, 3);
-          Serial.println("send");
+          
           if (current_status==0);{
           send_status=0;
           }
@@ -75,17 +77,14 @@ if (vw_have_message()){
 }
 uint8_t buf1[4];
 uint8_t buflen1 = 4;
-
+//read incoming commandos to send
 if (Serial.available() > 0) {
     send_status = 1;
-    Serial.println("sending");
     Serial.readBytes(buf1,buflen1);
     CCE_speed=(buf1[0]-48)*100+(buf1[1]-48)*10+buf1[2]-48;   
-    Serial.println(CCE_speed);
     current_status=(buf1[3]-48);
-    Serial.println(current_status);
   }
-	// Send a reply
+
 
         }
         
