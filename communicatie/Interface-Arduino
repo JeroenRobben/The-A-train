@@ -15,13 +15,14 @@
 
 int TRANSMIT_PIN = 12;
 int RECEIVE_PIN =13;
-int CCE_speed;
+int CCE_speed=100
+;
 byte current_status = 1;                            //variable die zegt of we sturen of niet
 byte send_status = 0;
 int TrainSpeed;
 int baken;
 byte TrainDirection;
-
+byte Train_status;
 // RF adresses:
 int CCE_ADRESS = 0;
 int COMM_ADRESS = 1;
@@ -41,40 +42,41 @@ void setup()
 void loop()
 { 
     
-    uint8_t buf[VW_MAX_MESSAGE_LEN];
-    uint8_t buflen = VW_MAX_MESSAGE_LEN;
+  uint8_t buf[VW_MAX_MESSAGE_LEN];
+  uint8_t buflen = VW_MAX_MESSAGE_LEN;
     
     
 
     // Wait for a message
-if (vw_have_message()){
-  if (vw_get_message(buf, &buflen)) // Non-blocking
-    {
-      if (buf[0] == COMM_ADRESS){
-        baken=buf[1];
-        current_status=buf[2];
-        TrainSpeed=buf[3];
-        TrainDirection=buf[4];
-        //print incoming message for use interface
-        Serial.print(baken);
-        Serial.print(" , ");
-        Serial.print(current_status);
-        Serial.print(" , ");
-        Serial.print(TrainSpeed);
-        Serial.print(" , ");
-        Serial.println(TrainDirection);
+  if (vw_have_message()){
+    if (vw_get_message(buf, &buflen)) // Non-blocking
+      {
+        
+        if (buf[0] == CCE_ADRES){
+          baken=buf[1];
+          Train_status=buf[2];
+          TrainSpeed=buf[3];
+          TrainDirection=buf[4];
+          //print incoming message for use interface
+          Serial.print(baken);
+          Serial.print("_,_");
+          Serial.print(Train_status);
+          Serial.print("_,_");
+          Serial.print(TrainSpeed);
+          Serial.print("_,_");
+          Serial.println(TrainDirection);
        
-   uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status};
-        if (send_status==1){
-    vw_send(msg, 3);
+          uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status};
+          if (send_status==1){
+            vw_send(msg, 3);
           
-          if (current_status==0);{
-          send_status=0;
+            if (current_status==0);{
+              send_status=0;
+            }
           }
-          }
+       }
       }
-    }
-}
+  }
 uint8_t buf1[4];
 uint8_t buflen1 = 4;
 //read incoming commandos to send
@@ -83,8 +85,6 @@ if (Serial.available() > 0) {
     Serial.readBytes(buf1,buflen1);
     CCE_speed=(buf1[0]-48)*100+(buf1[1]-48)*10+buf1[2]-48;   
     current_status=(buf1[3]-48);
-  }
-
-
-        }
+}
+}
         
