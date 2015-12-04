@@ -1,1 +1,160 @@
+// TO DO:
+// Musiek bij aankomst bij station
+// Signaal bij noodgeval
+// Waarde voor de lichtsensor
 
+#include <Servo.h>
+
+// Variables for defining Arduino pins.
+const int PIN_buitenlicht = A5;
+const int PIN_binnenlicht = 4;
+const int PIN_noodstop = 7;
+const int PIN_alarm = A2;
+const int PIN_deur = 6;
+const int PIN_aankomstIn = 3;
+const int PIN_LDR = A1;
+Servo servoDeur;
+
+// Variables for determining if it is dark outside.
+boolean dark = false;
+const int maxLightValue = 500;       // Waarde moet nog ingevuld worden.
+
+// Variables for emergency stop.
+unsigned long previousMillis = 0;
+boolean lightState = HIGH;
+
+// Variables for signal when arriving at a station.
+char notesTerminal[] = "a a a f C a f C a E E E F C G F C a ";
+int beatsTerminal[] = {50, 20, 50, 20, 50, 20, 40, 5, 20, 5, 60, 10, 40, 5, 20, 5, 60, 10, 40, 5, 20, 5, 60, 40};
+int tempo = 10;
+int songLengthTerminal = 36;
+
+// Optional: Variables for signal when arriving at the international terminal.
+/*
+char notesInternational[] = "abcd";
+int beatsInternational[] = {1, 2, 3, 4};
+int songLengthInternational = 4
+ */
+
+// Variables for emergency signal.
+char notesAlarm[] = "ab ac";
+int beatsAlarm[] = {2, 3, 1, 3, 2};
+int songLengthAlarm = 5;
+
+#include <Wire.h>
+
+void setup() {
+  // Defining Arduino pins
+  pinMode(PIN_buitenlicht, OUTPUT);
+  pinMode(PIN_binnenlicht, OUTPUT);
+  pinMode(PIN_noodstop, INPUT);
+  pinMode(PIN_LDR, INPUT);
+  servoDeur.attach(PIN_deur);
+  
+  Wire.begin(PIN_aankomstIn);
+}
+
+void loop() {
+  // Things that happen when data is received from communication.
+  while (Wire.available()) {
+    char comm = Wire.read();
+    if (comm == 0) {
+      // If communication sends a 0, this means the doors of the train must close.
+      servoDeur.write(90);
+    }
+    else if (comm == 1) {
+      // If communication sends a 1, this means the doors of the train must open.
+      servoDeur.write(180);
+    }
+    else if (comm == 5 or comm == 6) {
+      // If communication sends a 5, this means the train has arrived at a regular station.
+      // If communication sends a 6, this means the train has arrived at the international station.
+      //Play music
+      int i, duration;
+
+      for (i=0; i<songLengthTerminal; i++) {
+        duration = beatsTerminal[i] * tempo;
+        // If the current note is a whitespace, this means a rest. The program will wait 'duration' milliseconds.
+        if (notesTerminal[i] == ' ') {
+          delay(duration);
+        }
+        else {
+          // If the current note is not a rest, the function 'frequency' will return the frequency of the current note.
+          // The function tone will play this tone for 'duration' milliseconds.
+          tone(PIN_alarm, frequency(notesTerminal[i]), duration);
+          delay(duration);
+        }
+        // At the end of each note, there will be a 'tempo/10' milliseconds delay.
+      }
+    }
+  }
+  
+  // Checking LDR
+  if (analogRead(PIN_LDR) > maxLightValue) {
+    if (dark == false) {
+      dark = true;
+      digitalWrite(PIN_buitenlicht, HIGH);
+      digitalWrite(PIN_binnenlicht, HIGH);
+    }
+  }
+  else if (dark == true) {
+    dark = false;
+    digitalWrite(PIN_buitenlicht, LOW);
+    digitalWrite(PIN_binnenlicht, LOW);
+  }
+  
+  // Checking emergency state
+  while (digitalRead(PIN_noodstop)) {
+    // currentMillis stores the amount of time since the program started.
+    unsigned long currentMillis = millis();
+    if ((lightState = HIGH) && ((currentMillis - previousMillis) > 200)) {
+      // If the lights are on and at least 200 ms have passed since they were turned on, the previousMillis is updated and the lights are turned off.
+      previousMillis = currentMillis;
+      lightState = LOW;
+    }
+    if ((lightState = LOW) && ((currentMillis - previousMillis) > 500)) {
+      // If the lights are off and at least 500 ms have passed since they were turned off, the previousMillis is updated and the lights are turned on.
+      previousMillis = currentMillis;
+      lightState = HIGH;
+    }
+    digitalWrite(PIN_buitenlicht, lightState);
+    // alarm
+    // As long as the train is in emergency state, an alarm signal will sound.
+    /*
+    int i, duration;
+
+    for (i=0; i<songLengthAlarm; i++) {
+      duration = beatsAlarm[i] * tempo;
+      if (notesAlarm[i] == ' ') {
+        delay(duration);
+      }
+      else {
+        tone(PIN_alarm, frequency(notesAlarm[i]), duration);
+        delay(duration);
+      }
+      delay(tempo/10);
+    }
+    delay(20);
+    */
+    int duration = 1000;
+    int freq = 1000;
+    tone(PIN_alarm, freq, duration);
+    delay(duration);
+  }
+}
+
+// Helper function that returns the frequentie of given note.
+int frequency(char note) {
+  int i;
+  const int numNotes = 8;
+
+  char names[] = {'c', 'd', 'e', 'f', 'g', 'a', 'b', 'C'};
+  int frequencies[] = {262, 294, 330, 349, 392, 440, 494, 523};
+
+  for (i=0; i<numNotes; i++) {
+    if (note == names[i]) {
+      return frequencies[i];
+    }
+  }
+  return 0;
+}
