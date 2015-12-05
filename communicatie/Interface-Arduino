@@ -15,14 +15,14 @@
 
 int TRANSMIT_PIN = 12;
 int RECEIVE_PIN =13;
-int CCE_speed=100
-;
+int CCE_speed=100;
 byte current_status = 1;                            //variable die zegt of we sturen of niet
 byte send_status = 0;
 int TrainSpeed;
 int baken;
 byte TrainDirection;
 byte Train_status;
+byte Previous_message_received;
 // RF adresses:
 int CCE_ADRESS = 0;
 int COMM_ADRESS = 1;
@@ -55,8 +55,9 @@ void loop()
         if (buf[0] == CCE_ADRES){
           baken=buf[1];
           Train_status=buf[2];
-          TrainSpeed=buf[3];
-          TrainDirection=buf[4];
+          Previous_message_received=buf[3];
+          TrainSpeed=buf[4];
+          TrainDirection=buf[5];
           //print incoming message for use interface
           Serial.print(baken);
           Serial.print("_,_");
