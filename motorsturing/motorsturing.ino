@@ -55,9 +55,9 @@ byte terminal = 0;					//0 = No Terminal, 1 = International Terminal, 2 = Nation
 
 //ENGINE AND SPEED CONTROL
 volatile byte direction = 1;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
-volatile int speed_COMM_raw = 180;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
-int speed_COMM_sens = 700; 				//speed sensor value to be approached, calculated from speed_COMM_raw
-byte speed_pwm = 100; 					//speed directly written to engine - PWM - 0-255
+volatile int speed_COMM_raw = 50;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
+int speed_COMM_sens = 0; 				//speed sensor value to be approached, calculated from speed_COMM_raw
+byte speed_pwm = 0; 					//speed directly written to engine - PWM - 0-255
 
 //SENSORS
 
@@ -178,6 +178,7 @@ void speed_send(bool dont_brake = true){		//Send desired speed to engines
 	else{						//hard brake
 		digitalWrite(PIN_MOTOR_V, HIGH);
 		digitalWrite(PIN_MOTOR_A, HIGH);
+    speed_pwm = 0;
 	}
 }
 
@@ -197,12 +198,12 @@ void speed_calc() {					//Calculate desired speed written to engines
 		speed_pwm == 0;
 	}
 
-							//decrease speed
-	else if ((speed_COMM_sens > speed_raw) && (speed_pwm > 0)){
+							//increase speed
+	else if ((speed_COMM_sens > (speed_raw - 10)) && (speed_pwm < 255)){
 		speed_pwm += 1;
 	}
-							//increase speed
-	else if ((speed_COMM_sens < speed_raw) && (speed_pwm < 255)){
+							//decrease speed
+	else if ((speed_COMM_sens < (speed_raw + 10)) && (speed_pwm > 0)){
 		speed_pwm -= 1;
 	}
 }
@@ -286,13 +287,12 @@ void update_lcd(){
 	Serial1.print(speed_pwm);
 	//Serial1.print("m/s");
 	setlcdCursor(16);
-	Serial1.print(emergency_COMM);
+	Serial1.print(speed_raw);
 	Serial1.print(" ");
 	Serial1.print(emergency_local);
 	Serial1.print(" ");
 	Serial1.print(speed_COMM_sens);
-	Serial1.print(" ");
-	Serial1.print(speed_raw);
+
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// I2C & INTERRUPT FUNCTIONS///////////////////////////////////////////
@@ -364,7 +364,7 @@ void setup() {
 	//Attach emergency interrupt (emergency from COMM)
 	//attachInterrupt(digitalPinToInterrupt(PIN_EM_IN), emergency_COMM_isr, RISING);
 
-	Serial1.begin(1200); 				//Communication with Serial1
+	Serial1.begin(19200); 				//Communication with Serial1
 
 	delay(2000);					//Boot time
 
@@ -389,7 +389,7 @@ void loop() {
 	}
 
 	update_lcd();
-	delay(5);
+	delay(20);
 /*							//stay in loop while COMM is in emergency mode
 	while((emergency_COMM == true) || (digitalRead(PIN_EM_IN) == HIGH)){
 

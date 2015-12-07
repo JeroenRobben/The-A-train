@@ -348,7 +348,7 @@ void setBacklight(uint8_t backlightSetting)
 void setBaudRate(uint8_t baudSetting)
 {
 
-  baudSetting = 1;
+  baudSetting = 6;
     
   switch(baudSetting)
   {
