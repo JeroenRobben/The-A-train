@@ -27,7 +27,7 @@ MMMMMMMM               MMMMMMMM     OOOOOOOOO           TTTTTTTTTTT           OO
 //******Pin definitions********
 
 //Sensors
-const byte PIN_SPEED = A3; //
+const byte PIN_SPEED = A3;
 const byte PIN_COLLISION = A4;
 
 //Motor
@@ -84,17 +84,6 @@ byte emergency_local = 0; 				//Local emergency level
 volatile bool emergency_COMM = false; 			//COMM 	emergency level
 bool debug = false;				
 
-/*
-float OMTREK_WIEL = 0.115;
-float MAX_RPM = 250; ////Aan te passen na meting !!!!!!!!!!! ////
-float MAX_PWM = 255;
-float MAX_MPS = (0.115 * (MAX_RPM / 60));
-float MAX_SPEED = 255;
-//float gewenste_snelheid_mps = 0;  //in mps
-//float snelheid_mps = 0; //ogenblikkelijke snelheid mps
-//float snelheid_rpm = 0; //ogenblikkelijk toerental
-*/
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// HELPER FUNCTIONS////////////////////////////////////////////////////
@@ -109,9 +98,6 @@ void update_sensors(){
 
 							//Speed sensor
 	speed_raw = analogRead(PIN_SPEED);
-
-	//snelheid_rpm = (speed_raw * MAX_RPM) / 1023 ;
-	//snelheid_mps = OMTREK_WIEL * (snelheid_rpm / 60) ;
 
 
 	collision_raw = analogRead(PIN_COLLISION);	//Collision sensors
@@ -364,11 +350,11 @@ void setup() {
 	//Attach emergency interrupt (emergency from COMM)
 	//attachInterrupt(digitalPinToInterrupt(PIN_EM_IN), emergency_COMM_isr, RISING);
 
-	Serial1.begin(19200); 				//Communication with Serial1
+	Serial1.begin(19200); 				//Communication with LCD
 
 	delay(2000);					//Boot time
 
-	setBacklight(255);				//Serial1 on
+	setBacklight(255);				//LCD on
 	clearDisplay();
 
 }
