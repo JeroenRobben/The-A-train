@@ -130,12 +130,28 @@ class TheATrain:
             for ID in self.Train.NextBeaconID:
                 if self.Beacons.ID[ID].Number == int(DataArray[0]):
                     possibleCurrentBeaconIDs.append(ID)
+            trainToKeep = ""
             for ID2 in possibleCurrentBeaconIDs:
-                if self.Beacons.ID[ID2].Location != self.Train.Location:
-                    possibleCurrentBeaconDistances.append(float("inf"))
-                else:
+                if not self.Train.visible and self.Beacons.ID[ID2].Location == self.Train.Location:
                     distance = abs(self.Beacons.ID[ID2].Index - self.Train.LocationIndex)
                     possibleCurrentBeaconDistances.append(distance)
+                elif self.TrainDuplicate.visible and self.Beacons.ID[ID2].Location == self.Train.Location:
+                    distance = abs(self.Beacons.ID[ID2].Index - self.Train.LocationIndex)
+                    possibleCurrentBeaconDistances.append(distance)
+                    trainToKeep = self.Train
+                elif self.TrainDuplicate.visible and self.Beacons.ID[ID2].Location == self.TrainDuplicate.Location:
+                    distance = abs(self.Beacons.ID[ID2].Index - self.Train.LocationIndex)
+                    possibleCurrentBeaconDistances.append(distance)
+                    trainToKeep = self.TrainDuplicate
+                else:
+                    possibleCurrentBeaconDistances.append(float("inf"))
+            if self.TrainDuplicate.visible and trainToKeep == self.Train:
+                self.TrainDuplicate.visible = False
+            elif self.TrainDuplicate.visible and trainToKeep == self.TrainDuplicate:
+                self.Train.Location = self.TrainDuplicate.Location
+                self.Train.LocationIndex = self.TrainDuplicate.LocationIndex
+                self.Train.IndexDirection = self.TrainDuplicate.IndexDirection
+                self.TrainDuplicate.visible = False
             closestBeaconDistance = float("inf")
             closestBeaconIndex = 0
             for index in range(0, len(possibleCurrentBeaconDistances)):
@@ -214,7 +230,7 @@ class TheATrain:
                                             style=wx.ALIGN_LEFT | wx.ST_NO_AUTORESIZE)
         self.NextBeaconText.SetFont(self.Font1)
 
-        self.SendText = wx.StaticText(self.Panel, pos=(420, 710), label="Send status and speed to Train A:",
+        self.SendText = wx.StaticText(self.Panel, pos=(480, 710), label="Send status and speed to Train A:",
                                       size=(400, 28), style=wx.ALIGN_LEFT | wx.ST_NO_AUTORESIZE)
         self.SendText.SetFont(self.Font1)
         self.StatusBox = wx.RadioBox(self.Panel, pos=(480, 740), size=(130, 85),
@@ -292,8 +308,8 @@ class TheATrain:
         self.SwitchLeft.Index = int(where(ArrayXCurve == -STRAIGHT/2)[0][0])
         self.SwitchRight = sphere(radius=1.5, color=color.black, pos=(STRAIGHT/2, 0, RADIUS-50))
         self.SwitchRight.Index = int(where(ArrayXCurve == STRAIGHT/2)[0][0])
-        self.SwitchLeft.Status = 0       # 0=off, 1=on, 2=unknown
-        self.SwitchRight.Status = 0      # 0=off, 1=on, 2=unknown
+        self.SwitchLeft.Status = 2       # 0=off, 1=on, 2=unknown
+        self.SwitchRight.Status = 2      # 0=off, 1=on, 2=unknown
 
         # beacon types: 0=straight, 1=terminal, 2=terminalInternational, 3=turn, 4=switch
         #               5=turn&switch, 6=terminalArrival&switch, 7=terminalArrival (8=terminalDeparture)
@@ -330,7 +346,9 @@ class TheATrain:
         message = str(self.SendSpeedValue) + str(self.SendStatusValue)
         while len(message) != 4:
             message = "0" + message
-        self.ArduinoData.write(message)
+        print message
+        if SERIAL_ON:
+            self.ArduinoData.write(message)
 
 
 class train(sphere):
@@ -389,3 +407,4 @@ print "Starting TheATrain..."
 theATrain = TheATrain()
 theATrain.mainloop()
 print "Finished"
+print "Jef was here :DDDDDD"
