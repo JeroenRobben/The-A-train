@@ -12,17 +12,28 @@
 // $Id: server.pde,v 1.1 2008/04/20 09:24:17 mikem Exp $
 
 #include "VirtualWireWithoutPTT.h"
+//server variables
 
 int TRANSMIT_PIN = 12;
 int RECEIVE_PIN =13;
-int CCE_speed=100;
+volatile int CCE_speed=128;
 byte current_status = 1;                            //variable die zegt of we sturen of niet
-byte send_status = 0;
+volatile byte send_status = 0;
 int TrainSpeed;
 int baken;
 byte TrainDirection;
 byte Train_status;
-byte Previous_message_received;
+byte Train_message_received;
+
+//joystick variables
+
+int PIN_joystick=A0;
+int speedNow=0;
+int speedLast=0;
+int Speedarray[7]={0,43,85,128,170,212,255};
+int i=3;
+int PIN_manual_on=52;
+int PIN_switch=2;
 // RF adresses:
 int CCE_ADRESS = 0;
 int COMM_ADRESS = 1;
@@ -37,7 +48,14 @@ void setup()
     // Initialise the IO and ISR
     vw_setup(2000);	 // Bits per sec
     vw_rx_start();       // Start the receiver PLL running
+    pinMode(PIN_joystick,INPUT);
+pinMode(PIN_manual_on,OUTPUT);
+ pinMode(PIN_switch,INPUT);
+ digitalWrite(PIN_manual_on,LOW);
+  
+  attachInterrupt(digitalPinToInterrupt(PIN_switch),send_interrupt,RISING);
 }
+
 //te zenden bericht (ontvanger=1, snelheid, status)
 void loop()
 { 
@@ -52,10 +70,10 @@ void loop()
     if (vw_get_message(buf, &buflen)) // Non-blocking
       {
         
-        if (buf[0] == CCE_ADRES){
+        if (buf[0] == CCE_ADRESS){
           baken=buf[1];
           Train_status=buf[2];
-          Previous_message_received=buf[3];
+          Train_message_received=buf[3];
           TrainSpeed=buf[4];
           TrainDirection=buf[5];
           //print incoming message for use interface
@@ -78,6 +96,28 @@ void loop()
        }
       }
   }
+//als de switch aan staat kunnen we aansturen
+  if (digitalRead(PIN_manual_on)==HIGH){
+  speedNow=analogRead(PIN_joystick);
+  
+    //berekent welke snelheid
+  if (speedNow!=speedLast && speedNow==1023 && i<6){
+    i=i+1;
+    CCE_speed=Speedarray[i];
+    Serial.println("speed up");
+  }
+  else if(speedNow!=speedLast && speedNow==0 && i>0){
+    i=i-1;
+  CCE_speed=Speedarray[i];
+  Serial.println("speed down");
+  }
+
+speedLast=speedNow;
+Serial.println(CCE_speed);
+delay(100);
+}
+
+
 uint8_t buf1[4];
 uint8_t buflen1 = 4;
 //read incoming commandos to send
@@ -87,5 +127,20 @@ if (Serial.available() > 0) {
     CCE_speed=(buf1[0]-48)*100+(buf1[1]-48)*10+buf1[2]-48;   
     current_status=(buf1[3]-48);
 }
+}
+//interrupt functie als men schakelt
+void send_interrupt(){
+  Serial.println("interrupt");
+  CCE_speed=128;
+  if (send_status==0){
+    digitalWrite(PIN_manual_on,HIGH);
+    send_status=1;
+    
+  }
+  else {
+    digitalWrite(PIN_manual_on,LOW);
+    send_status=0;
+   }
+  
 }
         
