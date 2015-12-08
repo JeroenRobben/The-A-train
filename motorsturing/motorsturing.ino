@@ -54,8 +54,8 @@ byte terminal = 0;					//0 = No Terminal, 1 = International Terminal, 2 = Nation
 
 
 //ENGINE AND SPEED CONTROL
-volatile byte direction = 1;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
-volatile int speed_COMM_raw = 50;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
+volatile byte direction = 2;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
+volatile int speed_COMM_raw = 0;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
 int speed_COMM_sens = 0; 				//speed sensor value to be approached, calculated from speed_COMM_raw
 byte speed_pwm = 0; 					//speed directly written to engine - PWM - 0-255
 
@@ -164,7 +164,7 @@ void speed_send(bool dont_brake = true){		//Send desired speed to engines
 	else{						//hard brake
 		digitalWrite(PIN_MOTOR_V, HIGH);
 		digitalWrite(PIN_MOTOR_A, HIGH);
-    speed_pwm = 0;
+    		speed_pwm = 0;
 	}
 }
 
@@ -181,7 +181,7 @@ void speed_calc() {					//Calculate desired speed written to engines
 	speed_COMM_to_speed_sens();			//Updates speed_COMM_sens
 
 	if (speed_COMM_sens == 0){ 			//stand still
-		speed_pwm == 0;
+		speed_pwm = 0;
 	}
 
 							//increase speed
@@ -309,9 +309,9 @@ void i2c_receive(int bytes_received){
 //EMERGENCY INTERRUPT FROM COMM
 void emergency_COMM_isr(){
 
-    digitalWrite(PIN_MOTOR_V, HIGH); 			//brake
-    digitalWrite(PIN_MOTOR_A, HIGH);
-    emergency_COMM = true;
+    	digitalWrite(PIN_MOTOR_V, HIGH); 			//brake
+    	digitalWrite(PIN_MOTOR_A, HIGH);
+    	emergency_COMM = true;
 	speed_COMM_raw = 0;
 	direction = 2;
 }
