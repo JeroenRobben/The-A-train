@@ -23,6 +23,7 @@
 */ 
 
 boolean TURN_OFF_EMERGENCY = true;
+boolean INITIALISATION_MESSAGE = false;
 
 #include <Wire.h>                                      // include library for I2C communication.
 #include "VirtualWireWithoutPTT.h"                     // include library for radio communication.
@@ -37,6 +38,7 @@ int PIN_EMERGENCY_MOTOR = 0;                           // emergency interrupt pi
 int PIN_EMERGENCY_COMMUNICATION = 7;                   // emergency interrupt pin.
 int TRANSMIT_PIN = 12;                                 // radio transmitter pin.
 int RECEIVE_PIN =13;                                   // radio receiver pin.
+int SPEED_PIN = A3;                                    // speed measure pin
 
 // I2C adresses:
 byte MOTOR_ADRESS = 2;
@@ -64,7 +66,7 @@ unsigned long last_loop_time;                          // time in milliseconds o
 unsigned long loop_start_time;                         // time in milliseconds since Arduino startup. The starting time of the last loop.
 
 // Timing control variables:
-float TIME_BETWEEN_TRANSMISSIONS = 2000;               // time in milliseconds between radio transmissions. 
+float TIME_BETWEEN_TRANSMISSIONS = 900;               // time in milliseconds between radio transmissions. 
 float TIME_TO_OPEN_DOORS = 1500;                       // time in milliseconds between stopping the train and opening the doors. 
 float TIME_TO_CLOSE_DOORS = 1500;                      // time in milliseconds between closing the doors and departure. 
 float terminal_waiting_time = 20000;                   // time in milliseconds. The time the train must wait in a normal terminal.
@@ -81,6 +83,7 @@ boolean CCE_message_received = false;                  // did the train receive 
 byte previous_speedbyte;                               // copy of the previous values sent to motor to avoid multiple identical I2C messages.
 byte previous_directionbyte;
 byte previous_location_sent;
+boolean initialisation_message_received = false;
 
 // Speed & direction:
 volatile byte CCE_speed;                               // value between 0 and 255. Speed desired by CCE, when in CCE controlled mode.
@@ -93,6 +96,8 @@ byte FULL_SPEED = 180;
 byte HALF_SPEED = 100;
 byte SLOW_SPEED = 60;
 byte STOP = 0; 
+byte measured_speed;
+byte measured_direction;
 
 // Location types: 
 byte STRAIGHT_TRACK = 0;
@@ -105,7 +110,10 @@ byte TRACK_SWITCH_AND_TURN = 5;                  // only a beacon type, cannot b
 byte TRACK_SWITCH_AND_TERMINAL_ARRIVAL = 6;      // only a beacon type, cannot be a current location.
 
 byte TERMINAL_ARRIVAL = 7;
-byte TERMINAL_DEPARTURE = 8;                     // only a location type, cannot be a beacon type.
+byte TERMINAL_ARRIVAL_AND_TURN = 8;
+byte TERMINAL_DEPARTURE = 9;                     // only a location type, cannot be a beacon type.
+
+
 
 // Beacon number -> beacon type array
 // Each beacon can have a number from 0 to 15 so CCE can track our location. But we need to know the type of 
@@ -120,7 +128,7 @@ byte beacon_number_to_type[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
 void setup() {
 
   Serial.begin(115200);                              // start serial communication with pc, baudrate: 115200.
-  while (!Serial);
+  //while (!Serial);
   Serial.print("setup");
   Wire.begin();                                      // join i2c bus for communication with MOTOR and COMFORT (address optional for master).
   
@@ -136,10 +144,10 @@ void setup() {
   pinMode(PIN_IR_DECODER_D4, INPUT);
   pinMode(PIN_EMERGENCY_MOTOR, INPUT);
   pinMode(PIN_EMERGENCY_COMMUNICATION, OUTPUT);
+  pinMode(SPEED_PIN, INPUT);
   
-  pinMode(A1, INPUT);                           // declaring unused pins as input.
+  pinMode(A1, INPUT);
   pinMode(A2, INPUT);
-  pinMode(A3, INPUT);
   pinMode(A4, INPUT);
   pinMode(A5, INPUT);
   pinMode(4, INPUT);
@@ -147,15 +155,44 @@ void setup() {
   pinMode(6, INPUT);
   pinMode(9, INPUT);
   
-  
   current_location = STRAIGHT_TRACK;                 // start position and direction. Temporary solution since there is no initialisation message yet.
   track_speed_direction = FORWARD;
   beacon = 0; 
   location_change = true; 
   digitalWrite(PIN_EMERGENCY_COMMUNICATION, LOW);
+  
+  if (!TURN_OFF_EMERGENCY) {
+    delay(4000);
+    }
 
   attachInterrupt(digitalPinToInterrupt(PIN_IR_DECODER_VT), decoder_interrupt, RISING);      // call decoder interrupt function when VT pin goes high.
   attachInterrupt(digitalPinToInterrupt(PIN_EMERGENCY_MOTOR), emergency_interrupt, CHANGE);  // call emergency interrupt function when motor emergency pin changes.
+  
+  if (INITIALISATION_MESSAGE) {
+    uint8_t buf[VW_MAX_MESSAGE_LEN];                                          // initialize the VirtualWire buffer
+    uint8_t buflen = VW_MAX_MESSAGE_LEN;                                      // initialize the VirtualWire buffer length value.
+    
+    while (!initialisation_message_received) { 
+      vw_wait_rx();
+      if (vw_get_message(buf, &buflen)) {
+        if (buf[0] == COMM_ADRESS) {
+          beacon = buf[1];
+          terminal_waiting_time = buf[2];
+          terminal_international_waiting_time = buf[3];
+          for (int index=4; index<buflen; index++) {
+            beacon_number_to_type[index-2] = buf[index];
+            }
+          current_location = beacon_number_to_type[beacon];
+          track_speed_direction = FORWARD;
+          CCE_speed = 0;
+          CCE_speed_direction = FORWARD;
+          current_status = 1;
+          location_change = true;
+          initialisation_message_received = true;
+          }
+        }
+      }
+    }
   
   loop_start_time = millis();                                                         // save the loop start time.
   next_transmission_time = loop_start_time + TIME_BETWEEN_TRANSMISSIONS;              // set the time for the next radio transmission.
@@ -203,7 +240,10 @@ void loop() {
         get_CCE_message(buf, buflen);                                       // get the message.
         CCE_message_received = true;
         }
-      else CCE_message_received = false;
+      else if (buf[0] == CCE_ADRESS) {
+        Serial.println("Got message from train to CCE");
+        CCE_message_received = false;
+        }
       }
     else CCE_message_received = false;
     }
@@ -273,6 +313,12 @@ void decoder_interrupt() {                                     // when the decod
     }
   else if (beacon_type == TRACK_SWITCH_AND_TURN) {
     current_location = TRACK_TURN;
+    }
+  else if (beacon_type == TERMINAL_ARRIVAL_AND_TURN && current_location == TRACK_TURN) {
+    current_location == TERMINAL_ARRIVAL;
+    }
+  else if (beacon_type == TERMINAL_ARRIVAL_AND_TURN) {
+    current_location == TRACK_TURN;
     }
   else if (beacon_type == current_location) {
     current_location = STRAIGHT_TRACK;
@@ -356,7 +402,13 @@ void terminal_function() {                             // timing control in the 
 
 
 void send_CCE_message() {     
-  uint8_t msg[] = {CCE_ADRESS, beacon, current_status, CCE_message_received};
+  measured_speed = analogRead(SPEED_PIN)/4;  // We have to divide the measured speed (0-1024) by 4 to fit in a byte (0-256)
+  if (current_status == 0) {
+    measured_direction = track_speed_direction;
+    }
+  else measured_direction = CCE_speed_direction;
+  
+  uint8_t msg[] = {CCE_ADRESS, beacon, current_status, CCE_message_received, measured_speed, measured_direction};
   vw_send(msg, 4);
   vw_wait_tx();                           // Wait until the whole message is gone
   Serial.println("CCE message sent");
