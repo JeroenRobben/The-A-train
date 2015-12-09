@@ -1,0 +1,199 @@
+#
+# In class TheATrain, def set_mainwindow(self) the size of the window can be adjusted.
+#
+
+from visual import *
+from visual.graph import *
+
+RADIUS = 110.           # radius in cm
+STRAIGHT = 250.         # straight track length in cm
+TERMINAL_LENGTH = 120.  # length of the track between the switch and terminal in cm
+TERMINAL_RICO = 0.5     # rico of the track between the switch and terminal in cm
+
+FRAMERATE = 25                # frames per second
+
+# =================================== Control Variables =========================================================
+TrainAPosX = 0
+TrainAPosZ = 0
+TrainADuplicateVisible = False
+TrainADuplicatePosX = 0
+TrainADuplicatePosZ = 0
+
+#
+# ===============================================================================================================
+
+class TheATrain:
+    def __init__(self):
+
+        self.Beacons = dict()
+        self.Trains = dict()
+        self.Locations = dict()
+        self.Switches = dict()
+
+        self.set_mainwindow()
+        self.draw_track()
+
+        self.FrameRate = FRAMERATE
+
+    def mainloop(self):
+        rate(self.FrameRate)
+
+        #update control variables
+        self.Trains["TrainA"].pos = (TrainAPosX, 0, TrainAPosZ)
+        self.Trains["TrainA"].Duplicate.visible = TrainADuplicateVisible
+        self.Trains["TrainA"].Duplicate.pos = (TrainADuplicatePosX, 0, TrainADuplicatePosZ)
+
+
+    def set_mainwindow(self):
+
+        self.Scene = display(title='The A Train')
+        self.Scene.width = 1000
+        self.Scene.height = 700
+
+    def draw_track(self):
+
+        self.Radius = RADIUS
+        self.Straight = STRAIGHT
+        self.TerminalLength = TERMINAL_LENGTH
+        self.TerminalRico = TERMINAL_RICO
+
+        self.Floor = box(pos=(0, -5, -30), length=500, width=350, height=10, color=color.white)
+
+        q1 = arange(0, pi*RADIUS/2, 1.)
+        q2 = q1 + pi*RADIUS/2
+        q3 = q1 + pi*RADIUS
+        q4 = q1 + pi*RADIUS*3/2
+
+        d1 = arange(0, TERMINAL_LENGTH, 1.)
+        d2 = -d1
+
+        ArrayXRightLowerCurve = RADIUS*cos(q1/RADIUS) + STRAIGHT/2
+        ArrayZRightLowerCurve = RADIUS*sin(q1/RADIUS) - 50
+        ArrayXLeftLowerCurve = RADIUS*cos(q2/RADIUS) - STRAIGHT/2
+        ArrayZLeftLowerCurve = RADIUS*sin(q2/RADIUS) - 50
+        ArrayXLeftUpperCurve = RADIUS*cos(q3/RADIUS) - STRAIGHT/2
+        ArrayZLeftUpperCurve = RADIUS*sin(q3/RADIUS) - 50
+        ArrayXRightUpperCurve = RADIUS*cos(q4/RADIUS) + STRAIGHT/2
+        ArrayZRightUpperCurve = RADIUS*sin(q4/RADIUS) - 50
+
+        ArrayXUpperStraight = arange(-STRAIGHT/2, STRAIGHT/2, 1.)
+        ArrayZUpperStraight = zeros(len(ArrayXUpperStraight))-RADIUS - 50
+        ArrayXLowerStraight = -ArrayXUpperStraight
+        ArrayZLowerStraight = zeros(len(ArrayXLowerStraight))+RADIUS - 50
+
+        ArrayXRightTerminal = d1/(sqrt(1.+TERMINAL_RICO**2)) + STRAIGHT/2
+        ArrayZRightTerminal = TERMINAL_RICO*d1/(sqrt(1.+TERMINAL_RICO**2)) + RADIUS - 50
+
+        ArrayXLeftTerminal = -d1/(sqrt(1.+TERMINAL_RICO**2)) - STRAIGHT/2
+        ArrayZLeftTerminal = -TERMINAL_RICO*(-d1/(sqrt(1.+TERMINAL_RICO**2))) + RADIUS - 50
+
+        ArrayXCurve = append(ArrayXRightLowerCurve, ArrayXLowerStraight)
+        ArrayXCurve = append(ArrayXCurve, ArrayXLeftLowerCurve)
+        ArrayXCurve = append(ArrayXCurve, ArrayXLeftUpperCurve)
+        ArrayXCurve = append(ArrayXCurve, ArrayXUpperStraight)
+        ArrayXCurve = append(ArrayXCurve, ArrayXRightUpperCurve)
+
+        ArrayZCurve = append(ArrayZRightLowerCurve, ArrayZLowerStraight)
+        ArrayZCurve = append(ArrayZCurve, ArrayZLeftLowerCurve)
+        ArrayZCurve = append(ArrayZCurve, ArrayZLeftUpperCurve)
+        ArrayZCurve = append(ArrayZCurve, ArrayZUpperStraight)
+        ArrayZCurve = append(ArrayZCurve, ArrayZRightUpperCurve)
+
+        self.Origin = sphere(radius=2., color=color.blue, pos=(0, 0, 0))
+
+        self.add_location(ID="Ellipse", xArray=ArrayXCurve, yArray=0, zArray=ArrayZCurve)
+        self.add_location(ID="RightTerminal", xArray=ArrayXRightTerminal, yArray=0, zArray=ArrayZRightTerminal)
+        self.add_location(ID="LeftTerminal", xArray=ArrayXLeftTerminal, yArray=0, zArray=ArrayZLeftTerminal)
+
+        self.add_switch(ID="SwitchLeft", location1=self.Locations["Ellipse"], location2=self.Locations["LeftTerminal"],
+                        location1Index=int(where(ArrayXCurve == -STRAIGHT/2)[0][0]), location2Index=0,
+                        status1=2, position=(-STRAIGHT/2, 0, RADIUS-50))
+        self.add_switch(ID="SwitchRight", location1=self.Locations["Ellipse"], location2=self.Locations["RightTerminal"],
+                        location1Index=int(where(ArrayXCurve == STRAIGHT/2)[0][0]), location2Index=0,
+                        status1=2, position=(STRAIGHT/2, 0, RADIUS-50))
+
+        # beacon types: 0=straight, 1=terminal, 2=terminalInternational, 3=turn, 4=switch
+        #               5=turn&switch, 6=terminalArrival&switch, 7=terminalArrival (8=terminalDeparture)
+        #               9=terminalArrival&turn
+
+        self.add_beacon(location=self.Locations["Ellipse"], ID="b0", number=0, type=0, index=0,
+                        surroundingBeaconIDs={"b1", "b11"}, visible=False)
+        self.add_beacon(self.Locations["Ellipse"], "b1", 4, 5, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - 50, {"b2", "b11"})
+        self.add_beacon(self.Locations["Ellipse"], "b2", 9, 4, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] + 50, {"b5", "b1", "b3"})
+        self.add_beacon(self.Locations["RightTerminal"], "b3", 6, 6, 50, {"b4", "b2"})
+        self.add_beacon(self.Locations["RightTerminal"], "b4", 8, 1, len(self.Locations["RightTerminal"].x)-1, {"b3"})
+        self.add_beacon(self.Locations["Ellipse"], "b5", 5, 4, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] - 50, {"b6", "b7", "b2"})
+        self.add_beacon(self.Locations["Ellipse"], "b6", 3, 5, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] + 50, {"b9", "b5"})
+        self.add_beacon(self.Locations["LeftTerminal"], "b7", 6, 6, 50, {"b8", "b5"})
+        self.add_beacon(self.Locations["LeftTerminal"], "b8", 7, 1, len(self.Locations["LeftTerminal"].x)-1, {"b7"})
+        for index in arange(len(self.Locations["Ellipse"].z)/2, len(self.Locations["Ellipse"].z)):
+            if self.Locations["Ellipse"].z[index] == -self.Radius - 50:
+                test = index
+                break
+        self.add_beacon(self.Locations["Ellipse"], "b9", 2, 9, test + 50, {"b6", "b10"})
+        self.add_beacon(self.Locations["Ellipse"], "b10", 1, 2, test + self.Straight/2, {"b9", "b11"})
+        self.add_beacon(self.Locations["Ellipse"], "b11", 2, 9, test + self.Straight - 50, {"b10", "b1"})
+
+        self.add_train(ID="TrainA", location=self.Locations["Ellipse"], lastBeacon=self.Beacons["b0"],
+                       previousLastBeacon=self.Beacons["b0"], nextBeacons={self.Beacons["b1"], self.Beacons["b11"]},
+                       serialDataIndex=[0, 1, 2, 3])
+
+    def add_beacon(self, location, ID, number, type, index, surroundingBeaconIDs=set([]), visible=True):
+        self.Beacons[ID] = beacon(location, ID, number, type, index, surroundingBeaconIDs, visible)
+
+    def add_train(self, ID, location, lastBeacon, previousLastBeacon, nextBeacons, serialDataIndex, radius=6., color=color.green, pos=(0, 0, 0), visible=True):
+        self.Trains[ID] = train(ID, location, lastBeacon, previousLastBeacon, nextBeacons, serialDataIndex, radius, color, pos, visible)
+        self.Trains[ID].Duplicate = train(ID+"Duplicate", location, lastBeacon, previousLastBeacon, nextBeacons, serialDataIndex, radius, color, pos, False)
+
+    def add_location(self, ID, xArray, yArray, zArray, color1=color.red, radius1=1.):
+        self.Locations[ID] = location(ID, xArray, yArray, zArray, color1, radius1)
+
+    def add_switch(self, ID, location1, location1Index, location2, location2Index, position, color1=color.black,
+                   status1=2, radius1=1.5):
+        self.Switches[ID] = switch(ID, location1, location1Index, location2, location2Index, position, status1, color1, radius1)
+
+class train(sphere):
+    def __init__(self, ID, location, lastBeacon, previousLastBeacon, nextBeacons, serialDataIndex, radius=6., color=color.green,
+                 pos=(0, 0, 0), visible=True):
+        sphere.__init__(self, radius=radius, color=color, pos=pos, visible=visible)
+        self.Speed = 0.                     # in cm/s
+        self.SpeedDirection = 1             # 1=forward
+        self.Location = location
+        self.Status = "Autonomous"
+        self.LastBeacon = lastBeacon
+        self.PreviousLastBeacon = previousLastBeacon
+        self.NextBeacons = nextBeacons
+        self.NextBeaconNumbers = {beacon1.Number for beacon1 in self.NextBeacons}
+        self.ID = ID
+
+class beacon(sphere):
+    def __init__(self, location, ID, number, type, index, surroundingBeaconIDs=set([]), visible=True):
+        self.Location = location
+        self.ID = ID
+        self.Number = number
+        self.Type = type
+        self.Index = index
+        self.SurroundingBeaconIDs = surroundingBeaconIDs
+
+        sphere.__init__(self, radius=3., color=color.blue, visible=visible,
+                        pos=(self.Location.x[int(index)], 0, self.Location.z[int(index)]))
+        self.Label = label(pos=(self.pos[0], 25, self.pos[2]), text=str(number), box=False, visible=visible)
+
+
+class location(curve):
+    def __init__(self, ID, xArray, yArray, zArray, color1=color.red, radius1=1.):
+        curve.__init__(self, x=xArray, y=yArray, z=zArray, color=color1, radius=radius1)
+        self.ID = ID
+
+
+class switch(sphere):
+    def __init__(self, ID, location1, location1Index, location2, location2Index, position, status=2, color1=color.black,
+                 radius1=1.5):
+        sphere.__init__(self, pos=position, color=color1, radius=radius1)
+        self.LocationIndex = dict([(location1, location1Index), (location2, location2Index)])
+        self.ID = ID
+        self.Status = status      # 0=off, 1=on, 2=unknown
+
+print "Starting TheATrain..."
+theATrain = TheATrain()
+print "Finished"
