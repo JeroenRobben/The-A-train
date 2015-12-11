@@ -84,7 +84,9 @@ byte emergency_local = 0; 				//Local emergency level
 volatile bool emergency_COMM = false; 			//COMM 	emergency level
 bool debug = false;
 bool booting = true;
-
+byte boot_status = 0;
+byte current_location = 0;
+byte time_next_depart = 0;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// HELPER FUNCTIONS////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,18 +269,30 @@ void setlcdCursor(byte cursor_position) {
 
 void update_lcd() {
     //clearDisplay();
-
-    Serial1.print("SPEED ");
-    Serial1.print(speed_COMM_raw);
-    setlcdCursor(10);
-    Serial1.print(speed_pwm);
-    Serial1.print("m/s");
-    setlcdCursor(16);
-    Serial1.print(speed_raw);
-    Serial1.print(" ");
-    Serial1.print(emergency_local);
-    Serial1.print(" ");
-    Serial1.print(speed_COMM_sens);
+    if(booting == true){
+    	Serial1.write(0xfa);
+    	Serial1.write(boot_status);
+    }
+    else{
+    	if ((emergency_local > 2) || (emergency_COMM == true)){
+    		Serial1.write(0xfb);
+    		if emergency_COMM == true{
+    			Serial1.write(6);
+    		}
+    		else{
+    			Serial1.write(emergency_local);
+    		}
+    	}
+    	else{
+    		Serial1.write(0xff);
+    		Serial1.write(current_location);
+    		Serial1.write(speed_comm_raw);
+    		Serial1.write(byte(speed_raw / 4));
+    		Serial1.write(time_next_depart);
+    		
+    	}
+    }
+   
   
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
