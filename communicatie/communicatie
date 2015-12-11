@@ -66,7 +66,7 @@ unsigned long last_loop_time;                          // time in milliseconds o
 unsigned long loop_start_time;                         // time in milliseconds since Arduino startup. The starting time of the last loop.
 
 // Timing control variables:
-float TIME_BETWEEN_TRANSMISSIONS = 900;               // time in milliseconds between radio transmissions. 
+float TIME_BETWEEN_TRANSMISSIONS = 1100;               // time in milliseconds between radio transmissions. 
 float TIME_TO_OPEN_DOORS = 1500;                       // time in milliseconds between stopping the train and opening the doors. 
 float TIME_TO_CLOSE_DOORS = 1500;                      // time in milliseconds between closing the doors and departure. 
 float terminal_waiting_time = 20000;                   // time in milliseconds. The time the train must wait in a normal terminal.
@@ -84,6 +84,7 @@ byte previous_speedbyte;                               // copy of the previous v
 byte previous_directionbyte;
 byte previous_location_sent;
 boolean initialisation_message_received = false;
+boolean finish_emergency = false;
 
 // Speed & direction:
 volatile byte CCE_speed;                               // value between 0 and 255. Speed desired by CCE, when in CCE controlled mode.
@@ -92,8 +93,8 @@ byte track_speed;                                      // value between 0 and 25
 byte track_speed_direction;                            // 1=forward, 0=backward. Direction when in independant mode.
 boolean FORWARD = 1;
 boolean BACKWARD = 0;
-byte FULL_SPEED = 180;
-byte HALF_SPEED = 100;
+byte FULL_SPEED = 210;
+byte HALF_SPEED = 110;
 byte SLOW_SPEED = 60;
 byte STOP = 0; 
 byte measured_speed;
@@ -118,7 +119,7 @@ byte TERMINAL_DEPARTURE = 9;                     // only a location type, cannot
 // Beacon number -> beacon type array
 // Each beacon can have a number from 0 to 15 so CCE can track our location. But we need to know the type of 
 // location this beacon marks. The value at the index of the beacon number represents the location type. 
-byte beacon_number_to_type[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+byte beacon_number_to_type[16] = {0, 2, 8, 5, 5, 4, 6, 1, 1, 4, 10, 11, 12, 13, 14, 15};
 
 
 // ============================================================================
@@ -155,7 +156,7 @@ void setup() {
   pinMode(6, INPUT);
   pinMode(9, INPUT);
   
-  current_location = STRAIGHT_TRACK;                 // start position and direction. Temporary solution since there is no initialisation message yet.
+  current_location = TRACK_TURN;                 // start position and direction. Temporary solution since there is no initialisation message yet.
   track_speed_direction = FORWARD;
   beacon = 0; 
   location_change = true; 
@@ -177,8 +178,8 @@ void setup() {
       if (vw_get_message(buf, &buflen)) {
         if (buf[0] == COMM_ADRESS) {
           beacon = buf[1];
-          terminal_waiting_time = buf[2];
-          terminal_international_waiting_time = buf[3];
+          terminal_waiting_time = buf[2]*1000;
+          terminal_international_waiting_time = buf[3]*1000;
           for (int index=4; index<buflen; index++) {
             beacon_number_to_type[index-2] = buf[index];
             }
@@ -210,6 +211,10 @@ void loop() {
   if (current_status == 2) {
     Serial.println("Emergency situation!"); 
     delay(100);
+    }
+  else if (finish_emergency) {
+    send_motor_speed(); 
+    finish_emergency = false;
     }
   // ----------- Location change ---------------------------------------------------------------------------------------------------------------
   else if (location_change) {                                      // things that happen when location type changes. 
@@ -273,7 +278,7 @@ void emergency_interrupt() {                                   // when the emerg
       current_status = 1;                                      // but wait for a message from CCE to start again.
       CCE_speed = 0;
       CCE_speed_direction = track_speed_direction; 
-      send_motor_speed();                          
+      finish_emergency = true;                         
       break;
     case 1:                                                    // if the line goes high, emergency situation started.
       current_status = 2;                                      // the next time a message will be sent to CCE, the
@@ -299,6 +304,9 @@ void decoder_interrupt() {                                     // when the decod
     // don't change the current location... 
     return;
     }
+  if (current_location == TERMINAL_DEPARTURE && (beacon_type == TERMINAL || beacon_type == TERMINAL_INTERNATIONAL)) {
+    return;
+    }
   else if (beacon_type == TERMINAL_ARRIVAL && current_location == TERMINAL_DEPARTURE) {
     current_location = STRAIGHT_TRACK;
     }
@@ -315,10 +323,10 @@ void decoder_interrupt() {                                     // when the decod
     current_location = TRACK_TURN;
     }
   else if (beacon_type == TERMINAL_ARRIVAL_AND_TURN && current_location == TRACK_TURN) {
-    current_location == TERMINAL_ARRIVAL;
+    current_location = TERMINAL_ARRIVAL;
     }
   else if (beacon_type == TERMINAL_ARRIVAL_AND_TURN) {
-    current_location == TRACK_TURN;
+    current_location = TRACK_TURN;
     }
   else if (beacon_type == current_location) {
     current_location = STRAIGHT_TRACK;
@@ -339,8 +347,11 @@ void location_change_function() {                       // things that happen wh
   if (current_location == STRAIGHT_TRACK) {
     track_speed = FULL_SPEED;
     }
-  else if (current_location == TRACK_TURN || current_location == TRACK_SWITCH) {
+  else if (current_location == TRACK_TURN) {
     track_speed = HALF_SPEED; 
+    }
+  else if (current_location == TRACK_SWITCH) {
+    track_speed = SLOW_SPEED;
     }
   else if (current_location == TERMINAL_ARRIVAL) {
     track_speed = SLOW_SPEED;
@@ -348,7 +359,7 @@ void location_change_function() {                       // things that happen wh
     }
   else if (current_location == TERMINAL) {
     track_speed = STOP;
-    track_speed_direction = !track_speed_direction;
+    track_speed_direction = !bool(track_speed_direction);
     arrival_time = millis();
     doors_opening_time = arrival_time + TIME_TO_OPEN_DOORS; 
     }
@@ -408,8 +419,8 @@ void send_CCE_message() {
     }
   else measured_direction = CCE_speed_direction;
   
-  uint8_t msg[] = {CCE_ADRESS, beacon, current_status, CCE_message_received, measured_speed, measured_direction};
-  vw_send(msg, 4);
+  uint8_t msg[] = {CCE_ADRESS, beacon, current_status, CCE_message_received, measured_speed, measured_direction, current_location};
+  vw_send(msg, 7);
   vw_wait_tx();                           // Wait until the whole message is gone
   Serial.println("CCE message sent");
   } 
