@@ -54,8 +54,8 @@ byte terminal = 0;					//0 = No Terminal, 1 = International Terminal, 2 = Nation
 
 
 //ENGINE AND SPEED CONTROL
-volatile byte direction = 1;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
-volatile int speed_COMM_raw = 200 ;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
+volatile byte direction = 2;   				//0 = backward, 1 = forward 2 = stand still - received by COMM
+volatile int speed_COMM_raw = 0 ;  			//Speed wanted by COMM, can be changed by interrupt 0 - 255
 int speed_COMM_sens = 0; 				//speed sensor value to be approached, calculated from speed_COMM_raw
 byte speed_pwm = 0; 					//speed directly written to engine - PWM - 0-255
 
@@ -83,7 +83,7 @@ const int BOTS_REF[] = {950, 390, 200};		/*
 byte emergency_local = 0; 				//Local emergency level
 volatile bool emergency_COMM = false; 			//COMM 	emergency level
 bool debug = false;
-
+bool booting = true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// HELPER FUNCTIONS////////////////////////////////////////////////////
@@ -267,6 +267,7 @@ void setlcdCursor(byte cursor_position) {
 
 void update_lcd() {
     //clearDisplay();
+
     Serial1.print("SPEED ");
     Serial1.print(speed_COMM_raw);
     setlcdCursor(10);
@@ -355,7 +356,7 @@ void setup() {
 
   setBacklight(255);				//LCD on
   clearDisplay();
-
+  booting = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
