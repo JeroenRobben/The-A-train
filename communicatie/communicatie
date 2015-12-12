@@ -24,6 +24,7 @@
 
 boolean TURN_OFF_EMERGENCY = true;
 boolean INITIALISATION_MESSAGE = false;
+boolean SMART_GUI = false;
 
 #include <Wire.h>                                      // include library for I2C communication.
 #include "VirtualWireWithoutPTT.h"                     // include library for radio communication.
@@ -298,6 +299,17 @@ void decoder_interrupt() {                                     // when the decod
   ir_decoder_d4 = digitalRead(PIN_IR_DECODER_D4);
   
   beacon = 1*ir_decoder_d1 + 2*ir_decoder_d2 + 4*ir_decoder_d3 + 8*ir_decoder_d4;   // get the beacon number.
+
+  beacon_translation();
+  
+  beacon_ticks = 50;                                    // set beacon ticks to prevent multiple registration of the same beacon.
+  }    
+    
+// ============================================================================
+// =========                   HELPER FUNCTIONS                       =========
+// ============================================================================    
+
+void beacon_translation() {
   beacon_type = beacon_number_to_type[beacon];                                      // translate the beacon number to the beacon type.
   
   if (beacon_type == TERMINAL && current_location != TERMINAL_ARRIVAL) {            // change the current location dependant on the beacon.
@@ -335,12 +347,7 @@ void decoder_interrupt() {                                     // when the decod
     current_location = beacon_type;
     }
   location_change = true;
-  beacon_ticks = 50;                                    // set beacon ticks to prevent multiple registration of the same beacon.
-  }    
-    
-// ============================================================================
-// =========                   HELPER FUNCTIONS                       =========
-// ============================================================================    
+  }
 
 void location_change_function() {                       // things that happen when the current location changes.
   
@@ -435,7 +442,7 @@ void get_CCE_message(uint8_t buff[], uint8_t bufflen) {
     } 
   Serial.println("");                      // ...|
   
-  if (bufflen == 3) {                      // only interpret the messages with length 3. 
+  if (bufflen == 3 || bufflen == 4) {                      // only interpret the messages with length 3 of five. 
     current_status = buff[2];
     if (current_status == 1) {             // if status == CCE_controlled:
       digitalWrite(PIN_EMERGENCY_COMMUNICATION, LOW); 
@@ -450,6 +457,10 @@ void get_CCE_message(uint8_t buff[], uint8_t bufflen) {
     else {                                 // if status == CCE_independant:
       digitalWrite(PIN_EMERGENCY_COMMUNICATION, LOW);
       location_change = true;
+      }
+    if (bufflen == 4 && SMART_GUI) {
+      beacon = buff[3];
+      beacon_translation();
       }
     }
   }
