@@ -5,20 +5,31 @@ from visual.graph import *
 import wx
 import serial
 import time
+import socket
 
-SERIAL_ON = True
+SERIAL_ON = False
+WEBSERVER = False
+SMART_GUI = False
+SMART_GUI_DISTANCE = 60   # distance to previous smart beacon to react on
 
-RADIUS = 110.           # radius in cm
-STRAIGHT = 250.         # straight track length in cm
+
+if WEBSERVER:
+    webserver1 = socket.socket()
+    webserver1.connect(('airportpeoplemover.uk.to',3000))
+
+RADIUS = 116.           # radius in cm
+STRAIGHT = 330.         # straight track length in cm
 TERMINAL_LENGTH = 120.  # length of the track between the switch and terminal in cm
 TERMINAL_RICO = 0.5     # rico of the track between the switch and terminal in cm
 
 FRAMERATE = 25                # frames per second
 SpeedPWMToSpeed = 400./1000.  # in cm/(s PWM)
 
-
 class TheATrain:
     def __init__(self):
+
+        if WEBSERVER:
+            self.webserver = webserver1
 
         self.Beacons = dict()
         self.Trains = dict()
@@ -59,7 +70,7 @@ class TheATrain:
 
                 accelerationTerm = Train.IndexDirection*Train.cmPerFrame - Train.PreviouscmPerFrame*Train.PreviousIndexDirection
                 accelerationTerm *= (self.timerecord - self.previoustimerecord)
-                Train.LocationIndex += accelerationTerm
+                Train.LocationIndex += accelerationTerm/2.
 
                 if Train.Duplicate.visible:
                     Train.Duplicate.PreviousLocationIndex = Train.Duplicate.PreviousLocationIndex
@@ -68,22 +79,7 @@ class TheATrain:
                     accelerationTerm2 = Train.Duplicate.IndexDirection*Train.Duplicate.cmPerFrame - \
                                         Train.Duplicate.PreviouscmPerFrame*Train.Duplicate.PreviousIndexDirection
                     accelerationTerm2 *= (self.timerecord - self.previoustimerecord)
-                    Train.Duplicate.LocationIndex += accelerationTerm2
-
-                # End of ellipse fix:
-                if Train.Location == self.Locations["Ellipse"] and Train.LocationIndex <= len(self.Locations["Ellipse"].x):
-                    Train.LocationIndex -= len(self.Locations["Ellipse"].x)
-                if Train.Location == self.Locations["Ellipse"] and Train.LocationIndex < 0:
-                    Train.LocationIndex += len(self.Locations["Ellipse"].x)
-
-                # End of left terminal fix:
-                if Train.Location == self.Locations["LeftTerminal"] and Train.LocationIndex >= len(self.Locations["LeftTerminal"].x):
-                    Train.LocationIndex = len(self.Locations["LeftTerminal"].x) - 1
-
-                # Start of left terminal fix:
-                if Train.Location == self.Locations["LeftTerminal"] and Train.LocationIndex < 0:
-                    Train.Location = self.Locations["Ellipse"]
-                    Train.LocationIndex += self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]]
+                    Train.Duplicate.LocationIndex += accelerationTerm2/2.
 
                 # Left switch:
                 if Train.Location == self.Locations["Ellipse"] and Train.IndexDirection == 1 \
@@ -93,17 +89,6 @@ class TheATrain:
                         self.duplicate_train(Train)
                     Train.Location = self.Locations["LeftTerminal"]
                     Train.LocationIndex -= self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]]
-
-                # End of right terminal fix:
-                if Train.Location == self.Locations["RightTerminal"] and Train.LocationIndex >= len(self.Locations["RightTerminal"].x):
-                    Train.LocationIndex = len(self.Locations["RightTerminal"].x) - 1
-
-                # Start of right terminal fix:
-                if Train.Location == self.Locations["RightTerminal"] and Train.LocationIndex < 0:
-                    Train.Location = self.Locations["Ellipse"]
-                    Train.LocationIndex = self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - Train.LocationIndex
-                    Train.IndexDirection = 1
-                    Train.PreviousIndexDirection = 1
 
                 # Right switch:
                 if Train.Location == self.Locations["Ellipse"] and Train.IndexDirection == -1 \
@@ -116,16 +101,72 @@ class TheATrain:
                     Train.IndexDirection = 1
                     Train.PreviousIndexDirection = 1
 
+                # End of left terminal fix:
+                if Train.Location == self.Locations["LeftTerminal"] and Train.LocationIndex >= len(self.Locations["LeftTerminal"].x):
+                    Train.LocationIndex = len(self.Locations["LeftTerminal"].x) - 1
+
+                # Start of left terminal fix:
+                if Train.Location == self.Locations["LeftTerminal"] and Train.LocationIndex < 0:
+                    Train.Location = self.Locations["Ellipse"]
+                    Train.LocationIndex += self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]]
+
+                # End of right terminal fix:
+                if Train.Location == self.Locations["RightTerminal"] and Train.LocationIndex >= len(self.Locations["RightTerminal"].x):
+                    Train.LocationIndex = len(self.Locations["RightTerminal"].x) - 1
+
+                # Start of right terminal fix:
+                if Train.Location == self.Locations["RightTerminal"] and Train.LocationIndex < 0:
+                    Train.Location = self.Locations["Ellipse"]
+                    Train.LocationIndex = self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - Train.LocationIndex
+                    Train.IndexDirection = 1
+                    Train.PreviousIndexDirection = 1
+
+                # End of ellipse fix:
+                if Train.Location == self.Locations["Ellipse"] and Train.LocationIndex >= len(self.Locations["Ellipse"].x):
+                    Train.LocationIndex -= len(self.Locations["Ellipse"].x)
+                if Train.Location == self.Locations["Ellipse"] and Train.LocationIndex < 0:
+                    Train.LocationIndex += len(self.Locations["Ellipse"].x)
+
                 xPos = Train.Location.x[int(Train.LocationIndex)]
                 zPos = Train.Location.z[int(Train.LocationIndex)]
 
                 Train.pos = (xPos, 0, zPos)
 
                 if Train.Duplicate.visible:
-                    xPos1 = Train.Duplicate.Location.x[int(Train.Duplicate.LocationIndex)]
-                    zPos1 = Train.Duplicate.Location.z[int(Train.Duplicate.LocationIndex)]
+                    xPosDupl = Train.Duplicate.Location.x[int(Train.Duplicate.LocationIndex)]
+                    zPosDupl = Train.Duplicate.Location.z[int(Train.Duplicate.LocationIndex)]
 
-                    Train.Duplicate.pos = (xPos1, 0, zPos1)
+                    Train.Duplicate.pos = (xPosDupl, 0, zPosDupl)
+                else:
+                    xPosDupl = 0
+                    zPosDupl = 0
+
+                if SMART_GUI:
+                    for Beacon in self.Beacons.itervalues():
+                        if Beacon.SmartBeacon and Train.Location == Beacon.Location:
+                            if Train.LastBeacon != Beacon \
+                                    and Train.IndexDirection == 1 \
+                                    and Train.LocationIndex >= Beacon.Index + SMART_GUI_DISTANCE:
+                                self.smartGuiSend(Beacon.Number)
+                                print "smart gui correction: " + str(Beacon.Number)
+                            elif Train.LastBeacon != Beacon \
+                                    and Train.IndexDirection == -1 \
+                                    and Train.LocationIndex <= Beacon.Index - SMART_GUI_DISTANCE:
+                                self.smartGuiSend(Beacon.Number)
+                                print "smart gui correction: " + str(Beacon.Number)
+
+                if WEBSERVER:
+                    self.webserver.send('echo ' + str(xPos) + ' > TrainAPosX\n')
+                    self.webserver.send('echo ' + str(zPos) + ' > TrainAPosZ\n')
+                    self.webserver.send('echo ' + str(self.Trains["TrainA"].Duplicate.visible) +
+                                        ' > TrainADuplicateVisible\n')
+                    self.webserver.send('echo ' + str(xPosDupl) + ' > TrainADuplicatePosX\n')
+                    self.webserver.send('echo ' + str(zPosDupl) + ' > TrainADuplicatePosZ\n')
+
+                    self.webserver.send('echo ' + str(self.Trains["TrainA"].Speed) + ' > speed')
+                    self.webserver.send('echo ' + str(self.Trains["TrainA"].LastBeacon) + ' > beacon')
+                    self.webserver.send('echo ' + str(self.Trains["TrainA"].SpeedDirection) + ' > direction')
+                    self.webserver.send('echo ' + str(self.Trains["TrainA"].Status) + ' > Status')
 
     def read_serial_data(self):
 
@@ -142,11 +183,14 @@ class TheATrain:
         self.BeaconText.SetLabelText(text="Last beacon: " + str(DataArray[0]))
 
         for Train in self.Trains.itervalues():
-            if Train.LastBeacon.Number != int(DataArray[Train.SerialDataIndex[0]]):
+            if Train.LastBeacon.Number != int(DataArray[0]):
                 possibleCurrentBeacons = list()
                 possibleCurrentBeaconDistances = list()
-                for Beacon in Train.NextBeacons:
-                    if Beacon.Number == int(DataArray[Train.SerialDataIndex[0]]):
+                #for Beacon in Train.NextBeacons:
+                #    if Beacon.Number == int(DataArray[0]):
+                #        possibleCurrentBeacons.append(Beacon)
+                for Beacon in self.Beacons.itervalues():
+                    if Beacon.Number == int(DataArray[0]):
                         possibleCurrentBeacons.append(Beacon)
                 for Beacon2 in possibleCurrentBeacons:
                     if Train.Duplicate.visible and Beacon2.Location == Train.Duplicate.Location:
@@ -166,7 +210,7 @@ class TheATrain:
                         possibleCurrentBeaconDistances.append(float("inf"))
                 closestBeaconDistance = float("inf")
                 closestBeaconIndex = 0
-                for index in range(0, len(possibleCurrentBeaconDistances)):
+                for index in range(0, len(possibleCurrentBeaconDistances)-1):
                     if possibleCurrentBeaconDistances[index] < closestBeaconDistance:
                         closestBeaconDistance = possibleCurrentBeaconDistances[index]
                         closestBeaconIndex = index
@@ -177,20 +221,20 @@ class TheATrain:
                 self.NextBeaconText.SetLabelText(text="Next beacon: " + str(Train.NextBeaconNumbers))
                 Train.LocationIndex = self.Beacons[Train.LastBeacon.ID].Index
 
-            if int(DataArray[Train.SerialDataIndex[1]]) == 0:
+            if int(DataArray[1]) == 0:
                 Train.Status = "Autonomous"
-            elif int(DataArray[Train.SerialDataIndex[1]]) == 1:
+            elif int(DataArray[1]) == 1:
                 Train.Status = "Controlled"
-            elif int(DataArray[Train.SerialDataIndex[1]]) == 2:
+            elif int(DataArray[1]) == 2:
                 Train.Status = "Emergecy!"
             self.StatusText.SetLabelText(text="Status: " + Train.Status)
 
-            SpeedPWM = int(DataArray[Train.SerialDataIndex[2]])
+            SpeedPWM = int(DataArray[2])
             Train.Speed = SpeedPWM * SpeedPWMToSpeed
             self.SpeedText.SetLabelText(text="Speed: " + str(round(Train.Speed, 2)) + " cm/s")
 
             Train.PreviousSpeedDirection = Train.SpeedDirection
-            Train.SpeedDirection = int(DataArray[Train.SerialDataIndex[3]])
+            Train.SpeedDirection = int(DataArray[3])
             if Train.PreviousSpeedDirection != Train.SpeedDirection:
                 Train.PreviousIndexDirection = Train.IndexDirection
                 Train.IndexDirection *= -1
@@ -244,11 +288,20 @@ class TheATrain:
         self.SendButton = wx.Button(self.Panel, label="Send", pos=(480, 834))
         self.SendButton.Bind(wx.EVT_BUTTON, self.sendCommand)
 
+        self.InitButton = wx.Button(self.Panel, label="Initialisation message", pos=(647, 834))
+        self.InitButton.Bind(wx.EVT_BUTTON, self.sendInitCommand)
+
     def toggleStatus(self, evt):
         self.SendStatusValue = self.StatusBox.GetSelection()
 
     def setSpeed(self, evt):
         self.SendSpeedValue = self.SpeedSlider.GetValue()
+
+    def sendInitCommand(self, evt):
+        message = "I"
+        if SERIAL_ON:
+            self.ArduinoData.write(message)
+        print "send initialisation command"
 
     def sendCommand(self, evt):
         message = str(self.SendSpeedValue) + str(self.SendStatusValue)
@@ -258,8 +311,16 @@ class TheATrain:
         if SERIAL_ON:
             self.ArduinoData.write(message)
 
-    def add_beacon(self, location, ID, number, type, index, surroundingBeaconIDs=set([]), visible=True):
-        self.Beacons[ID] = beacon(location, ID, number, type, index, surroundingBeaconIDs, visible)
+    def smartGuiSend(self, missedNumber):
+        message = str(missedNumber)
+        while len(message) != 2:
+            message = "0" + message
+
+        if SERIAL_ON:
+            self.ArduinoData.write(message)
+
+    def add_beacon(self, location, ID, number, type, index, surroundingBeaconIDs=set([]), visible=True, smartBeacon=False):
+        self.Beacons[ID] = beacon(location, ID, number, type, index, surroundingBeaconIDs, visible, smartBeacon)
 
     def add_train(self, ID, location, lastBeacon, previousLastBeacon, nextBeacons, serialDataIndex, radius=6., color=color.green, pos=(0, 0, 0), visible=True):
         self.Trains[ID] = train(ID, location, lastBeacon, previousLastBeacon, nextBeacons, serialDataIndex, radius, color, pos, visible)
@@ -322,7 +383,7 @@ class TheATrain:
         self.TerminalLength = TERMINAL_LENGTH
         self.TerminalRico = TERMINAL_RICO
 
-        self.Floor = box(pos=(0, -5, -30), length=500, width=350, height=10, color=color.white)
+        self.Floor = box(pos=(0, -5, -30), length=600, width=400, height=10, color=color.white)
 
         q1 = arange(0, pi*RADIUS/2, 1.)
         q2 = q1 + pi*RADIUS/2
@@ -383,19 +444,19 @@ class TheATrain:
 
         self.add_beacon(location=self.Locations["Ellipse"], ID="b0", number=0, type=0, index=0,
                         surroundingBeaconIDs={"b1", "b11"}, visible=False)
-        self.add_beacon(self.Locations["Ellipse"], "b1", 4, 5, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - 50, {"b2", "b11"})
-        self.add_beacon(self.Locations["Ellipse"], "b2", 9, 4, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] + 50, {"b5", "b1", "b3"})
-        self.add_beacon(self.Locations["RightTerminal"], "b3", 6, 6, 50, {"b4", "b2"})
-        self.add_beacon(self.Locations["RightTerminal"], "b4", 8, 1, len(self.Locations["RightTerminal"].x)-1, {"b3"})
-        self.add_beacon(self.Locations["Ellipse"], "b5", 5, 4, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] - 50, {"b6", "b7", "b2"})
-        self.add_beacon(self.Locations["Ellipse"], "b6", 3, 5, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] + 50, {"b9", "b5"})
-        self.add_beacon(self.Locations["LeftTerminal"], "b7", 6, 6, 50, {"b8", "b5"})
+        self.add_beacon(self.Locations["Ellipse"], "b1", 4, 5, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - 100, {"b2", "b11"})
+        self.add_beacon(self.Locations["Ellipse"], "b2", 9, 4, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] + 100, {"b1", "b3", "b5"}, smartBeacon=True)
+        self.add_beacon(self.Locations["RightTerminal"], "b3", 6, 6, 50, {"b2", "b4"}, smartBeacon=True)
+        self.add_beacon(self.Locations["RightTerminal"], "b4", 8, 1, len(self.Locations["RightTerminal"].x)-1, {"b3"}, smartBeacon=True)
+        self.add_beacon(self.Locations["Ellipse"], "b5", 5, 4, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] - 100, {"b2", "b6", "b7"})
+        self.add_beacon(self.Locations["Ellipse"], "b6", 3, 5, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] + 100, {"b9", "b5"})
+        self.add_beacon(self.Locations["LeftTerminal"], "b7", 6, 6, 50, {"b5", "b8"})
         self.add_beacon(self.Locations["LeftTerminal"], "b8", 7, 1, len(self.Locations["LeftTerminal"].x)-1, {"b7"})
         for index in arange(len(self.Locations["Ellipse"].z)/2, len(self.Locations["Ellipse"].z)):
             if self.Locations["Ellipse"].z[index] == -self.Radius - 50:
                 test = index
                 break
-        self.add_beacon(self.Locations["Ellipse"], "b9", 2, 9, test + 50, {"b6", "b10"})
+        self.add_beacon(self.Locations["Ellipse"], "b9", 2, 9, test + 50, {"b10", "b6"})
         self.add_beacon(self.Locations["Ellipse"], "b10", 1, 2, test + self.Straight/2, {"b9", "b11"})
         self.add_beacon(self.Locations["Ellipse"], "b11", 2, 9, test + self.Straight - 50, {"b10", "b1"})
 
@@ -432,13 +493,14 @@ class train(sphere):
 
 
 class beacon(sphere):
-    def __init__(self, location, ID, number, type, index, surroundingBeaconIDs=set([]), visible=True):
+    def __init__(self, location, ID, number, type, index, surroundingBeaconIDs=set([]), visible=True, smartBeacon=False):
         self.Location = location
         self.ID = ID
         self.Number = number
         self.Type = type
         self.Index = index
         self.SurroundingBeaconIDs = surroundingBeaconIDs
+        self.SmartBeacon = smartBeacon
 
         sphere.__init__(self, radius=3., color=color.blue, visible=visible,
                         pos=(self.Location.x[int(index)], 0, self.Location.z[int(index)]))

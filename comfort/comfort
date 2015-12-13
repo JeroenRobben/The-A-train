@@ -1,155 +1,207 @@
-// TO DO:
-// Musiek bij aankomst bij station
-// Signaal bij noodgeval
-// Waarde voor de lichtsensor
-
 #include <Servo.h>
+#include <Wire.h>
 
-// Variables for defining Arduino pins.
+// Defining Arduino pins:
 const int PIN_buitenlicht = A5;
 const int PIN_binnenlicht = 4;
-const int PIN_noodstop = 7;
+const int PIN_noodstop = 7; 
+const int PIN_noodstop2 = 0;
 const int PIN_alarm = A2;
 const int PIN_deur = 6;
-const int PIN_aankomstIn = 3;
 const int PIN_LDR = A1;
-Servo servoDeur;
 
-// Variables for determining if it is dark outside.
-boolean dark = false;
-const int maxLightValue = 500;       // Waarde moet nog ingevuld worden.
+// Define COMFORT I2C adress.
+const int I2C_adress_comfort = 3;          // The adress of comfort in the I2C communication.
 
-// Variables for emergency stop.
-unsigned long previousMillis = 0;
-boolean lightState = HIGH;
+// Control variables:
+volatile boolean terminalArrival = false;  // Values that can be changed in interrupt functions must be
+volatile boolean emergency = false;        // declared as volatile.
+boolean lightsIntOn = false;               // State of the internal and external lights
+boolean lightsExtOn = false;
+
+const int maxLightValue = 500;   // Waarde moet nog gemeten worden.
 
 // Variables for signal when arriving at a station.
-char notesTerminal[] = "a a a f C a f C a E E E F C G F C a ";
-int beatsTerminal[] = {50, 20, 50, 20, 50, 20, 40, 5, 20, 5, 60, 10, 40, 5, 20, 5, 60, 10, 40, 5, 20, 5, 60, 40};
+char notesTerminal[] = "a a a f C a f C a E E E F C a F C a ";
+int beatsTerminal[] = {50, 20, 50, 20, 50, 20, 40, 5, 20, 5, 60, 10, 40, 5, 20, 5, 60, 80, 50, 20, 50, 20, 50, 20, 40, 5, 20, 5, 60, 10, 40, 5, 20, 5, 60, 10}; 
 int tempo = 10;
 int songLengthTerminal = 36;
 
-// Optional: Variables for signal when arriving at the international terminal.
-/*
-char notesInternational[] = "abcd";
-int beatsInternational[] = {1, 2, 3, 4};
-int songLengthInternational = 4
- */
+// Variables for emergency stop.
+unsigned long previousMillis = 0;
 
-// Variables for emergency signal.
-char notesAlarm[] = "ab ac";
-int beatsAlarm[] = {2, 3, 1, 3, 2};
-int songLengthAlarm = 5;
-
-#include <Wire.h>
+Servo servoDeur;
 
 void setup() {
-  // Defining Arduino pins
+  // Set Arduino pinmodes: 
   pinMode(PIN_buitenlicht, OUTPUT);
   pinMode(PIN_binnenlicht, OUTPUT);
   pinMode(PIN_noodstop, INPUT);
+  pinMode(PIN_noodstop2, INPUT); 
   pinMode(PIN_LDR, INPUT);
-  servoDeur.attach(PIN_deur);
-  
-  Wire.begin(PIN_aankomstIn);
+  pinMode(PIN_alarm, OUTPUT);  
+  // Set unused Arduino pins in high-impedance input state.
+  pinMode(1, INPUT);
+  pinMode(5, INPUT); // Pin 2 and 3 are used for I2C communication.
+  pinMode(8, INPUT);
+  pinMode(9, INPUT);
+  pinMode(10, INPUT);
+  pinMode(11, INPUT);
+  pinMode(12, INPUT);
+  pinMode(13, INPUT);
+  pinMode(A0, INPUT);
+  pinMode(A3, INPUT);
+  pinMode(A4, INPUT);
+
+  servoDeur.attach(PIN_deur);  
+
+  delay(4000); // delay 4s to make sure that the emergency lines are pulled low by COMM and MOTOR
+
+  // Call emergency interrupt function when emergency line state changes.
+  attachInterrupt(digitalPinToInterrupt(PIN_noodstop), emergency_interrupt_function, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_noodstop2), emergency_interrupt_function, CHANGE);
+
+  Wire.begin(I2C_adress_comfort);  // Join the I2C communication with the right adress.
+  Wire.onReceive(receiveEvent);    // Define function to be called when receiving I2C data.
+  Serial.begin(9600);              // Debugging only
 }
 
 void loop() {
-  // Things that happen when data is received from communication.
-  while (Wire.available()) {
-    char comm = Wire.read();
-    if (comm == 0) {
-      // If communication sends a 0, this means the doors of the train must close.
-      servoDeur.write(90);
-    }
-    else if (comm == 1) {
-      // If communication sends a 1, this means the doors of the train must open.
-      servoDeur.write(180);
-    }
-    else if (comm == 5 or comm == 6) {
-      // If communication sends a 5, this means the train has arrived at a regular station.
-      // If communication sends a 6, this means the train has arrived at the international station.
-      //Play music
-      int i, duration;
-
-      for (i=0; i<songLengthTerminal; i++) {
-        duration = beatsTerminal[i] * tempo;
-        // If the current note is a whitespace, this means a rest. The program will wait 'duration' milliseconds.
-        if (notesTerminal[i] == ' ') {
-          delay(duration);
-        }
-        else {
-          // If the current note is not a rest, the function 'frequency' will return the frequency of the current note.
-          // The function tone will play this tone for 'duration' milliseconds.
-          tone(PIN_alarm, frequency(notesTerminal[i]), duration);
-          delay(duration);
-        }
-        // At the end of each note, there will be a 'tempo/10' milliseconds delay.
-      }
-    }
-  }
   
-  // Checking LDR
-  if (analogRead(PIN_LDR) > maxLightValue) {
-    if (dark == false) {
-      dark = true;
-      digitalWrite(PIN_buitenlicht, HIGH);
-      digitalWrite(PIN_binnenlicht, HIGH);
-    }
-  }
-  else if (dark == true) {
-    dark = false;
-    digitalWrite(PIN_buitenlicht, LOW);
-    digitalWrite(PIN_binnenlicht, LOW);
-  }
-  
-  // Checking emergency state
-  while (digitalRead(PIN_noodstop)) {
-    // currentMillis stores the amount of time since the program started.
-    unsigned long currentMillis = millis();
-    if ((lightState = HIGH) && ((currentMillis - previousMillis) > 200)) {
-      // If the lights are on and at least 200 ms have passed since they were turned on, the previousMillis is updated and the lights are turned off.
-      previousMillis = currentMillis;
-      lightState = LOW;
-    }
-    if ((lightState = LOW) && ((currentMillis - previousMillis) > 500)) {
-      // If the lights are off and at least 500 ms have passed since they were turned off, the previousMillis is updated and the lights are turned on.
-      previousMillis = currentMillis;
-      lightState = HIGH;
-    }
-    digitalWrite(PIN_buitenlicht, lightState);
-    // alarm
-    // As long as the train is in emergency state, an alarm signal will sound.
-    /*
+  check_LDR();  // Check if the lights should be switched on/off.
+  if (terminalArrival && !emergency) {  // Play arrival song
     int i, duration;
+    Serial.println("terminal arrival song start:");
 
-    for (i=0; i<songLengthAlarm; i++) {
-      duration = beatsAlarm[i] * tempo;
-      if (notesAlarm[i] == ' ') {
+    for (i=0; i<songLengthTerminal; i++) {
+      duration = beatsTerminal[i] * tempo;
+      // If the current note is a whitespace, this means a rest. The program will wait 'duration' milliseconds.
+      if (notesTerminal[i] == ' ') {
+        Serial.println("pauze");
         delay(duration);
       }
       else {
-        tone(PIN_alarm, frequency(notesAlarm[i]), duration);
-        delay(duration);
+        // If the current note is not a rest, the function 'frequency' will return the frequency of the current note.
+        // The function tone will play this tone for 'duration' milliseconds.
+        Serial.println("play tone");
+        tone(PIN_alarm, frequency(notesTerminal[i]), duration);
+        delay(duration); 
+        noTone(PIN_alarm); 
       }
-      delay(tempo/10);
+      if (emergency) break;  // If emergency interrupt is called during songplay, quit songplay.
+      check_LDR();           // If it became dark during songplay, switch on lights.
     }
-    delay(20);
-    */
-    int duration = 1000;
+    terminalArrival = false; // Reset terminalArrival
+  }
+
+  while (emergency) {        // As long as the train is in state of emergency:
+    if ((PIN_noodstop == LOW) && (PIN_noodstop2 == LOW)) {
+      break;
+    }
+    unsigned long currentMillis = millis();
+     // Lights: 
+    if ((lightsExtOn == HIGH) && ((currentMillis - previousMillis) > 200)) { 
+      // If the lights are on and at least 200 ms have passed since they were turned on, the previousMillis is updated and the lights are turned off.
+      previousMillis = currentMillis;
+      lightsExtOn = LOW;
+    }
+    if ((lightsExtOn == LOW) && ((currentMillis - previousMillis) > 500)) { 
+      // If the lights are off and at least 500 ms have passed since they were turned off, the previousMillis is updated and the lights are turned on.
+      previousMillis = currentMillis;
+      lightsExtOn = HIGH;
+    }
+    digitalWrite(PIN_buitenlicht, lightsExtOn);
+    // Alarm:
+    /*
+    int duration = 50; 
     int freq = 1000;
     tone(PIN_alarm, freq, duration);
-    delay(duration);
+    */
+    digitalWrite(PIN_alarm, HIGH);
+    delay(3);
+    digitalWrite(PIN_alarm, LOW);
+    delay(3);
+  }
+  // when exiting the emergency loop:
+  //noTone(PIN_alarm);
+  digitalWrite(PIN_alarm, LOW);
+}
+
+
+// --------------------------------------- helper/interrupt functions -----------------------------------------------
+
+
+void check_LDR() {
+  if (analogRead(PIN_LDR)<maxLightValue && (!lightsIntOn || !lightsExtOn)) {
+    Serial.print("LDR=");
+    Serial.print(analogRead(PIN_LDR));
+    Serial.print("  lightsExtOn=");
+    Serial.println(lightsExtOn);
+    Serial.println("switch on lights");
+    digitalWrite(PIN_buitenlicht, HIGH);
+    digitalWrite(PIN_binnenlicht, HIGH);
+    lightsExtOn = true;
+    lightsIntOn = true;
+  }
+  else if (analogRead(PIN_LDR)>maxLightValue && (lightsIntOn || lightsExtOn)) {
+    Serial.print("LDR=");
+    Serial.print(analogRead(PIN_LDR));
+    Serial.print("  lightsExtOn=");
+    Serial.println(lightsExtOn);
+    Serial.println("switch off lights");
+    digitalWrite(PIN_buitenlicht, LOW);
+    digitalWrite(PIN_binnenlicht, LOW);
+    lightsExtOn = false;
+    lightsIntOn = false;
+  }
+  else Serial.println(analogRead(PIN_LDR));
+}
+
+
+void receiveEvent(int howMany) {   // This function is called when receiving data from the I2C master
+  while (Wire.available()) {       // As long as there is data to read: 
+    int comm = (int) Wire.read();  // read a character and convert it to an integer.
+    Serial.print("I2C in: ");      // debug only
+    Serial.println(comm);   
+    if (comm == 0) {
+      // If communication sends a 0, this means the doors of the train must close.
+      Serial.println("-> close doors");
+      servoDeur.write(90);
+      //tone(PIN_alarm, frequency('a'), 500);
+    }
+    else if (comm == 1) {
+      // If communication sends a 1, this means the doors of the train must open.
+      Serial.println("-> open doors");
+      servoDeur.write(180);
+      //tone(PIN_alarm, frequency('a'), 500);
+    }
+    else if (comm == 2) { // 
+      // If communication sends a 2, this means the train is arriving a terminal.
+      Serial.println("-> terminal arrival");
+      terminalArrival = true;
+    }
   }
 }
+
+
+void emergency_interrupt_function() {
+  if (digitalRead(PIN_noodstop) || digitalRead(PIN_noodstop2)) {
+    emergency = true;
+    terminalArrival = false;    // prevents the continuation of the terminal song after emergency if the emergency function was called during the song. 
+  }
+  else {
+    emergency = false;
+  }
+}
+
 
 // Helper function that returns the frequentie of given note.
 int frequency(char note) {
   int i;
-  const int numNotes = 8;
+  const int numNotes = 12; 
 
-  char names[] = {'c', 'd', 'e', 'f', 'g', 'a', 'b', 'C'};
-  int frequencies[] = {262, 294, 330, 349, 392, 440, 494, 523};
+  char names[] = {'c', 'd', 'e', 'f', 'g', 'a', 'b', 'C', 'D', 'E', 'F', 'G'};
+  int frequencies[] = {262, 294, 330, 349, 392, 440, 494, 523, 587, 659, 698, 784};
 
   for (i=0; i<numNotes; i++) {
     if (note == names[i]) {
