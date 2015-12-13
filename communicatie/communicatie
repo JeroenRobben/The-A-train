@@ -495,6 +495,16 @@ void get_CCE_speed(uint8_t speedbyte) {                      // translate the sp
      When MOTOR pulls the emergency line high, COMM only sends a message to CCE (and doesn't pull the COMM emergency line high)
      When MOTOR pulls the emergency line low again, COMM will send a message to stand still untill CCE tells us to go on. 
      When COMM pulls the emergency line high and then low again, a message will be sent to motor with the desired speed.  
+
+     EDIT: a standard message contains the current location byte too. 
+     possible current_locations: 
+     STRAIGHT_TRACK = 0;
+     TERMINAL = 1;
+     TERMINAL_INTERNATIONAL = 2;
+     TRACK_TURN = 3;
+     TRACK_SWITCH = 4;
+     TERMINAL_ARRIVAL = 7;
+     TERMINAL_DEPARTURE = 9;                     
 */
 void send_motor_speed() { 
   byte speedbyte_send;                              // check which speed to send: the CCE speed or the automatic track speed:
@@ -516,14 +526,8 @@ void send_motor_speed() {
     }
   
   Wire.beginTransmission(MOTOR_ADRESS);                                 
-  if (current_location == TERMINAL || current_location == TERMINAL_INTERNATIONAL) {
-    const char message[] = {directionbyte_send, speedbyte_send, current_location};
-    Wire.write(message, 3);
-    }
-  else {
-    const char message[] = {directionbyte_send, speedbyte_send};
-    Wire.write(message, 2);
-    }
+  const char message[] = {directionbyte_send, speedbyte_send, current_location};
+  Wire.write(message, 3);
   Wire.endTransmission();  
 
   previous_speedbyte = speedbyte_send;
