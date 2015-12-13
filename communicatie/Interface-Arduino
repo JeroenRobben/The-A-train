@@ -12,8 +12,15 @@
 // $Id: server.pde,v 1.1 2008/04/20 09:24:17 mikem Exp $
 
 #include "VirtualWireWithoutPTT.h"
-//server variables
 
+// RF adresses:
+int CCE_ADRESS = 0;
+int COMM_ADRESS = 1;
+
+//INIT MESSAGE:
+uint8_t init_msg[] = {COMM_ADRESS, 0, 20, 40, 3, 2, 8, 5, 5, 4, 6, 1, 1, 4, 10, 11, 12, 13, 14, 15};
+
+//server variables
 int TRANSMIT_PIN = 12;
 int RECEIVE_PIN =13;
 volatile int CCE_speed=128;
@@ -24,6 +31,9 @@ int baken;
 byte TrainDirection;
 byte Train_status;
 byte Train_message_received;
+byte TrainLocation;
+boolean send_beacon_number = false;
+byte beacon_number;
 
 //joystick variables
 
@@ -34,71 +44,78 @@ int Speedarray[7]={0,43,85,128,170,212,255};
 int i=3;
 int PIN_manual_on=52;
 int PIN_switch=2;
-// RF adresses:
-int CCE_ADRESS = 0;
-int COMM_ADRESS = 1;
 
-void setup()
-{
-    Serial.begin(9600);	// Debugging only
+void setup() {
+  Serial.begin(9600);	// Debugging only
     
-    vw_set_tx_pin(TRANSMIT_PIN);                                                               // set virtual wire for RF communication
-    vw_set_rx_pin(RECEIVE_PIN);
+  vw_set_tx_pin(TRANSMIT_PIN);                                                               // set virtual wire for RF communication
+  vw_set_rx_pin(RECEIVE_PIN);
 
-    // Initialise the IO and ISR
-    vw_setup(2000);	 // Bits per sec
-    vw_rx_start();       // Start the receiver PLL running
-    pinMode(PIN_joystick,INPUT);
-pinMode(PIN_manual_on,OUTPUT);
- pinMode(PIN_switch,INPUT);
- digitalWrite(PIN_manual_on,LOW);
+  // Initialise the IO and ISR
+  vw_setup(2000);	 // Bits per sec
+  vw_rx_start();       // Start the receiver PLL running
+  pinMode(PIN_joystick,INPUT);
+  pinMode(PIN_manual_on,OUTPUT);
+  pinMode(PIN_switch,INPUT);
+  digitalWrite(PIN_manual_on,LOW);
   
   attachInterrupt(digitalPinToInterrupt(PIN_switch),send_interrupt,RISING);
-}
+  }
 
 //te zenden bericht (ontvanger=1, snelheid, status)
-void loop()
-{ 
+void loop() { 
     
   uint8_t buf[VW_MAX_MESSAGE_LEN];
   uint8_t buflen = VW_MAX_MESSAGE_LEN;
     
-    
-
-    // Wait for a message
+  // Wait for a message
   if (vw_have_message()){
-    if (vw_get_message(buf, &buflen)) // Non-blocking
-      {
-        
-        if (buf[0] == CCE_ADRESS){
-          baken=buf[1];
-          Train_status=buf[2];
-          Train_message_received=buf[3];
-          TrainSpeed=buf[4];
-          TrainDirection=buf[5];
-          //print incoming message for use interface
-          Serial.print(baken);
-          Serial.print("_,_");
-          Serial.print(Train_status);
-          Serial.print("_,_");
-          Serial.print(TrainSpeed);
-          Serial.print("_,_");
-          Serial.println(TrainDirection);
+    if (vw_get_message(buf, &buflen)) {
+  
+      if (buf[0] == CCE_ADRESS){
+        baken=buf[1];
+        Train_status=buf[2];
+        Train_message_received=buf[3];
+        TrainSpeed=buf[4];
+        TrainDirection=buf[5];
+        TrainLocation=buf[6];
+        //print incoming message for use interface
+        Serial.print(baken);
+        Serial.print(" , ");
+        Serial.print(Train_status);
+        Serial.print(" , ");
+        Serial.print(TrainSpeed);
+        Serial.print(" , ");
+        Serial.print(TrainDirection);
+        Serial.print(" , ");
+        Serial.println(TrainLocation);
        
-          uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status};
-          if (send_status==1){
-            vw_send(msg, 3);
+        if (send_status==1 && send_beacon_number){
+          uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status, beacon_number};
+          vw_send(msg, 4);
+          vw_wait_tx();
+          send_beacon_number = false;
           
-            if (current_status==0);{
-              send_status=0;
+          if (current_status==0);{
+            send_status=0;
             }
           }
-       }
+        else if (send_status==1) {
+          uint8_t msg[] = {COMM_ADRESS, CCE_speed, current_status};
+          vw_send(msg, 3);
+          vw_wait_tx();
+          
+          if (current_status==0);{
+            send_status=0;
+            }
+          }
+        }
       }
-  }
-//als de switch aan staat kunnen we aansturen
+    }
+  //als de switch aan staat kunnen we aansturen
   if (digitalRead(PIN_manual_on)==HIGH){
   speedNow=analogRead(PIN_joystick);
+  send_status=1;
   
     //berekent welke snelheid
   if (speedNow!=speedLast && speedNow==1023 && i<6){
@@ -108,26 +125,44 @@ void loop()
   }
   else if(speedNow!=speedLast && speedNow==0 && i>0){
     i=i-1;
-  CCE_speed=Speedarray[i];
-  Serial.println("speed down");
+    CCE_speed=Speedarray[i];
+    Serial.println("speed down");
+    }
+
+  speedLast=speedNow;
+  Serial.println(CCE_speed);
+  delay(100);
   }
 
-speedLast=speedNow;
-Serial.println(CCE_speed);
-delay(100);
-}
+  uint8_t buf1[4];
+  uint8_t buflen1 = 4;
+  //read incoming commandos to send
+  if (Serial.available() > 0) {
+    if (Serial.available() == 4) {
+      send_status = 1;
+      Serial.readBytes(buf1,buflen1);
+      CCE_speed = (buf1[0]-48)*100+(buf1[1]-48)*10+buf1[2]-48;   
+      current_status = (buf1[3]-48);
+      }
+    else if (Serial.available() == 2) {
+      send_status = 1;
+      Serial.readBytes(buf1,buflen1);
+      current_status = Train_status;
+      beacon_number = (buf1[0]-48)*10+buf1[1]-48;
+      send_beacon_number = true;
+      }
+    else if (Serial.available() == 1) {
+      vw_send(init_msg, 20);
+      vw_wait_tx();
+      }
+    else {
+      while (Serial.available() > 0); // empty serial buffer
+      char t = Serial.read();
+      }
+    }
+  }
 
-
-uint8_t buf1[4];
-uint8_t buflen1 = 4;
-//read incoming commandos to send
-if (Serial.available() > 0) {
-    send_status = 1;
-    Serial.readBytes(buf1,buflen1);
-    CCE_speed=(buf1[0]-48)*100+(buf1[1]-48)*10+buf1[2]-48;   
-    current_status=(buf1[3]-48);
-}
-}
+  
 //interrupt functie als men schakelt
 void send_interrupt(){
   Serial.println("interrupt");
