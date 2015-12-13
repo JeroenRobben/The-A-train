@@ -1,33 +1,36 @@
 #include <LiquidCrystal.h>
 
-//Unused Pins, will be flagged as INPUT
+							//Unused Pins, will be flagged as INPUT
 const byte UNUSED_PINS[] = {A0, A1, A2, A3, A4, A5, 1, 10, 11, 12, 13};
 const byte AMOUNT_UNUSED_PINS = 11;			//needed to loop through the above array
 
-char in;  // Character received from Serial1 input
+char in;  						// Character received from Serial input
 
-byte status = 2; // 0= booting, 1 = emergency 2 = normal
-byte boot_status = 3;
-byte emergency_level = 6;
-byte current_location = 4;
-int speed_raw = 900;
-int speed_cm = 420;
+byte status = 0; 					// 0 = booting, 1 = emergency 2 = normal
+byte boot_status = 0;					// 0 = Initiate, 2,3 = self checks, 4 = waiting for comm
+byte emergency_level = 0;				// see motorsturing.ino
+byte current_location = 0;				
+int speed_raw = 0;
+int speed_cm = 0;
 long time_next_depart = millis() + 15000;
 int time_till_depart = 0;
 
-byte old_status = 100;
-byte old_location = 100;
+byte old_status = 0;
+byte old_location = 0;
 int indicator_line = 0;
 long indicator_time = 0;
 byte indicator_i2c_counter = 0;
 const char indicator_i2c[] = {char(124), char(47), char(45), char(96)};
-char international_station[] = "International Station"; //21 characters
-char initiating_self_checks[] = "Initiating self checks"; //22 characters
-char initiated_by_central_command[] = "Initiated by central command"; //28
-char object_detected_at_front[] = "Object detected at front"; //24
-char object_detected_at_back[] = "Object detected at back"; //23
-// initialize the LCD at pins defined above
+char international_station[] = "International Station"; 			//21 characters
+char initiating_self_checks[] = "Initiating self checks"; 			//22 characters
+char initiated_by_central_command[] = "Initiated by central command"; 		//28
+char object_detected_at_front[] = "Object detected at front"; 			//24
+char object_detected_at_back[] = "Object detected at back"; 			//23
+
+
+
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7, 8);
+
 
 void setup(){
 	Serial1.begin(19200);
@@ -50,7 +53,6 @@ void setup(){
   lcd.print("  Waiting for   ");
   lcd.setCursor(0, 1);
   lcd.print("    arduino     ");
-  while(!Serial1);
   while(Serial1.available() == 0);
   lcd.clear(); 
 }
@@ -59,7 +61,7 @@ void setup(){
 void loop()
 {
   update_status();
-  Serial.println(status);
+  
   if((old_location != current_location) || (old_status != status)){
     indicator_line = 0;   
     indicator_time = millis();
@@ -68,6 +70,7 @@ void loop()
     time_next_depart = millis() + 20000;
   }
   indicator_line = ((millis() - indicator_time) / 500);
+  
   switch(status){
     case 0:
       boot();
@@ -88,24 +91,25 @@ void update_status()
   while (Serial1.available() > 0) {
       in = Serial1.read();
       indicator_i2c_counter += 2;
-      if ((in&0xff) == 0xfe){
+      if ((in&0xff) == 0xfe){					//BOOTING
          while(Serial1.available() == 0);
          boot_status = Serial1.read();
          status = 0;
           
         }
-        else if((in&0xff) == 0xfd){
+        else if((in&0xff) == 0xfd){				//EMERGENCY
           while(Serial1.available() == 0);
-          //EMERGENCY
           emergency_level = Serial1.read();
           status = 1;
         }
-        else if((in&0xff) == 0xfc){
-          //NORMAL
+        else if((in&0xff) == 0xfc){				//NORMAL
+          
           while(Serial1.available() == 0);
           current_location = Serial1.read();
+          
           while(Serial1.available() == 0);
           speed_raw = Serial1.read() * 4;
+          
           speed_cm = speed_raw / 10;
           status = 2;
         }
