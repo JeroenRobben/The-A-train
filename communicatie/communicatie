@@ -120,7 +120,7 @@ byte TERMINAL_DEPARTURE = 9;                     // only a location type, cannot
 // Beacon number -> beacon type array
 // Each beacon can have a number from 0 to 15 so CCE can track our location. But we need to know the type of 
 // location this beacon marks. The value at the index of the beacon number represents the location type. 
-byte beacon_number_to_type[16] = {0, 2, 8, 5, 5, 4, 6, 1, 1, 4, 10, 11, 12, 13, 14, 15};
+byte beacon_number_to_type[16] = {3, 2, 8, 5, 5, 4, 6, 1, 1, 4, 10, 11, 12, 13, 14, 15};
 
 
 // ============================================================================
