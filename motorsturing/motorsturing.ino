@@ -157,8 +157,8 @@ void speed_send(bool dont_brake = true) {		//Send desired speed to engines
       analogWrite(PIN_MOTOR_A, speed_pwm);
     }
     else if (direction == 2) { 		//stand still => brake
-      digitalWrite(PIN_MOTOR_V, LOW);
-      digitalWrite(PIN_MOTOR_A, LOW);
+      digitalWrite(PIN_MOTOR_V, HIGH);
+      digitalWrite(PIN_MOTOR_A, HIGH);
     }
 
   }
@@ -251,32 +251,16 @@ void emergency_local_check() {
 
 
 //LCD
-void setBacklight(byte brightness) {
-  Serial1.write(0x80);  				//send the backlight command
-  Serial1.write(brightness);  			//send the brightness value
-}
-
-void clearDisplay() {
-  Serial1.write(0xFE);  				//send the special command
-  Serial1.write(0x01);  				//send the clear screen command
-}
-
-void setlcdCursor(byte cursor_position) {
-  Serial1.write(0xFE);  				//send the special command
-  Serial1.write(0x80);  				//send the set cursor command
-  Serial1.write(cursor_position);  		//send the cursor position
-}
 
 void update_lcd() {
-    //clearDisplay();
     if(booting == true){
-    	Serial1.write(0xfa);
+    	Serial1.write(0xfe);
     	Serial1.write(boot_status);
     }
     else{
     	if ((emergency_local > 2) || (emergency_COMM == true)){
-    		Serial1.write(0xfb);
-    		if emergency_COMM == true{
+    		Serial1.write(0xfd);
+    		if (emergency_COMM == true){
     			Serial1.write(6);
     		}
     		else{
@@ -284,12 +268,9 @@ void update_lcd() {
     		}
     	}
     	else{
-    		Serial1.write(0xff);
+    		Serial1.write(0xfc);
     		Serial1.write(current_location);
-    		Serial1.write(speed_comm_raw);
-    		Serial1.write(byte(speed_raw / 4));
-    		Serial1.write(time_next_depart);
-    		
+    		Serial1.write(byte(speed_raw / 4));    		
     	}
     }
    
@@ -367,9 +348,6 @@ void setup() {
 
   Serial1.begin(19200); 				//Communication with LCD
   delay(2000);					//Boot time
-
-  setBacklight(255);				//LCD on
-  clearDisplay();
   booting = false;
 }
 
