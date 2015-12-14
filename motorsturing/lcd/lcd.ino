@@ -2,7 +2,7 @@
 
 //Unused Pins, will be flagged as INPUT
 const byte UNUSED_PINS[] = {A0, A1, A2, A3, A4, A5, 1, 10, 11, 12, 13};
-const byte AMOUNT_UNUSED_PINS = 11;			//needed to loop through the above array
+const byte AMOUNT_UNUSED_PINS = 11;      //needed to loop through the above array
 
 char in;  // Character received from Serial1 input
 
@@ -78,11 +78,11 @@ void speed_print(){
 }
 
 void setup(){
-	Serial1.begin(19200);
+  Serial1.begin(19200);
  
   for (byte i = 0; i < AMOUNT_UNUSED_PINS; i++) {
-	pinMode(UNUSED_PINS[i], INPUT);
-	}
+  pinMode(UNUSED_PINS[i], INPUT);
+  }
 
   lcd.begin(16, 2);
   
