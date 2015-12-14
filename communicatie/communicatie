@@ -191,6 +191,7 @@ void setup() {
           current_status = 1;
           location_change = true;
           initialisation_message_received = true;
+          Serial.println("init message received");
           }
         }
       }
