@@ -26,8 +26,56 @@ char initiating_self_checks[] = "Initiating self checks"; //22 characters
 char initiated_by_central_command[] = "Initiated by central command"; //28
 char object_detected_at_front[] = "Object detected at front"; //24
 char object_detected_at_back[] = "Object detected at back"; //23
+
 // initialize the LCD at pins defined above
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7, 8);
+
+void banner(char string[], byte length_string, bool show_i2c = false){
+    if(show_i2c){
+        if (indicator_line > length_string - 13){
+            indicator_line = 0;
+            indicator_time = millis();
+        }
+        if (indicator_line < (length_string - 14)){
+            for(byte i = indicator_line; i < (15 + indicator_line); i++){
+            lcd.print(string[i]);
+            }
+            lcd.print(indicator_i2c[indicator_i2c_counter/64]);          
+        }
+        else{
+            lcd.print("               ");
+            lcd.print(indicator_i2c[indicator_i2c_counter/64]);
+            } 
+    }
+    
+    else{
+        if (indicator_line > length_string - 14){
+            indicator_line = 0;
+            indicator_time = millis();
+        }
+        if (indicator_line < (length_string - 15)){
+            for(byte i = indicator_line; i < (16 + indicator_line); i++){
+            lcd.print(string[i]);
+            }          
+        }
+        else{
+              lcd.print("                ");
+            }
+      
+    }
+    
+}
+
+void speed_print(){
+  lcd.print("Speed: ");
+  if (speed_cm < 10){
+      lcd.print(" ");
+  }
+  lcd.print(speed_cm);
+  lcd.print("cm/s");
+  lcd.print("  ");
+  lcd.print(indicator_i2c[indicator_i2c_counter/64]);
+}
 
 void setup(){
 	Serial1.begin(19200);
@@ -59,7 +107,6 @@ void setup(){
 void loop()
 {
   update_status();
-  Serial.println(status);
   if((old_location != current_location) || (old_status != status)){
     indicator_line = 0;   
     indicator_time = millis();
@@ -167,17 +214,19 @@ void normal(){
       lcd.print("bend track ");
       break;
     case 2: //Arriving at international station
-      lcd.print("  Arriving at   ");
+      lcd.print("  Arriving at  ");
+      lcd.print(indicator_i2c[indicator_i2c_counter/64]);
       lcd.setCursor(0,1);
       banner(international_station, 21);
       break;
     case 3: //Arriving at national station
-      lcd.print("  Arriving at   ");
+      lcd.print("  Arriving at  ");
+      lcd.print(indicator_i2c[indicator_i2c_counter/64]);
       lcd.setCursor(0,1);
       lcd.print("National Station ");
       break;
     case 4: //In international station
-      banner(international_station, 21);      
+      banner(international_station, 21, true);      
       lcd.setCursor(0,1);
       if (time_till_depart > 9){
         lcd.print("Departure in ");
@@ -216,29 +265,5 @@ void normal(){
     }
 }
 
-void banner(char string[], byte length_string){
-    if (indicator_line > length_string - 14){
-        indicator_line = 0;
-        indicator_time = millis();
-    }
-    if (indicator_line < (length_string - 15)){
-        for(byte i = indicator_line; i < (16 + indicator_line); i++){
-        lcd.print(string[i]);
-        }          
-    }
-    else{
-          lcd.print("                ");
-        }
-}
 
-void speed_print(){
-  lcd.print("Speed: ");
-  if (speed_cm < 10){
-      lcd.print(" ");
-  }
-  lcd.print(speed_cm);
-  lcd.print("cm/s");
-  lcd.print("  ");
-  lcd.print(indicator_i2c[indicator_i2c_counter/64]);
-}
 
