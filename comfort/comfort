@@ -95,7 +95,7 @@ void loop() {
   }
 
   while (emergency) {        // As long as the train is in state of emergency:
-    if ((PIN_noodstop == LOW) && (PIN_noodstop2 == LOW)) {
+    if ((PIN_noodstop == LOW)) {// && (PIN_noodstop2 == LOW)) {
       break;
     }
     unsigned long currentMillis = millis();
