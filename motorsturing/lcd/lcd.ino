@@ -4,7 +4,7 @@
 const byte UNUSED_PINS[] = {A0, A1, A2, A3, A4, A5, 1, 10, 11, 12, 13};
 const byte AMOUNT_UNUSED_PINS = 11;      //needed to loop through the above array
 
-char in;  // Character received from Serial1 input
+char in;  // Character received from Serial input
 
 byte status = 2; // 0= booting, 1 = emergency 2 = normal
 byte boot_status = 3;
@@ -78,7 +78,7 @@ void speed_print(){
 }
 
 void setup(){
-  Serial1.begin(19200);
+  Serial.begin(19200);
  
   for (byte i = 0; i < AMOUNT_UNUSED_PINS; i++) {
   pinMode(UNUSED_PINS[i], INPUT);
@@ -98,8 +98,8 @@ void setup(){
   lcd.print("  Waiting for   ");
   lcd.setCursor(0, 1);
   lcd.print("    arduino     ");
-  while(!Serial1);
-  while(Serial1.available() == 0);
+  while(!Serial);
+  while(Serial.available() == 0);
   lcd.clear(); 
 }
 
@@ -132,27 +132,27 @@ void loop()
 
 void update_status()
 {
-  while (Serial1.available() > 0) {
-      in = Serial1.read();
+  while (Serial.available() > 0) {
+      in = Serial.read();
       indicator_i2c_counter += 2;
       if ((in&0xff) == 0xfe){
-         while(Serial1.available() == 0);
-         boot_status = Serial1.read();
+         while(Serial.available() == 0);
+         boot_status = Serial.read();
          status = 0;
           
         }
         else if((in&0xff) == 0xfd){
-          while(Serial1.available() == 0);
+          while(Serial.available() == 0);
           //EMERGENCY
-          emergency_level = Serial1.read();
+          emergency_level = Serial.read();
           status = 1;
         }
         else if((in&0xff) == 0xfc){
           //NORMAL
-          while(Serial1.available() == 0);
-          current_location = Serial1.read();
-          while(Serial1.available() == 0);
-          speed_raw = Serial1.read() * 4;
+          while(Serial.available() == 0);
+          current_location = Serial.read();
+          while(Serial.available() == 0);
+          speed_raw = Serial.read() * 4;
           speed_cm = speed_raw / 10;
           status = 2;
         }
@@ -220,7 +220,7 @@ void normal(){
       lcd.print("    Terminal    ");
       break;
     case 4: //Track switch
- 	speed_print();
+   speed_print();
       lcd.setCursor(0,1);
       lcd.print("switch track    ");
       break;
