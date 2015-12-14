@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 #include <Wire.h>
 //#include "P&O3.h" 					//comment this line for development in arduino IDE
 
@@ -70,7 +72,7 @@ bool collision_front = false;
 bool collision_back = false;
 
 
-const int BOTS_REF[] = {950, 390, 200};		/*
+const int BOTS_REF[] = {900, 340, 200};		/*
 							measured value between 1023 - BOTS_REF[0]		=> none of the sensors detecting object
 							measured value between BOTS_REF[0] - BOTS_REF[1] 	=> only front sensor detects object
 							measured value between BOTS_REF[1] - BOTS_REF[2] 	=> only back sensor detects object
@@ -166,7 +168,8 @@ void speed_send(bool dont_brake = true) {		//Send desired speed to engines
   else {						//hard brake
     digitalWrite(PIN_MOTOR_V, HIGH);
     digitalWrite(PIN_MOTOR_A, HIGH);
-    //speed_pwm = 0;
+    
+    speed_pwm = 0;
   }
 }
 
@@ -221,28 +224,30 @@ void emergency_local_check() {
   else if ((collision_front == true) && (collision_back == false) && (direction == 0)) {
     emergency_local = 1;
     digitalWrite(PIN_EM_OUT, LOW);
+
   }
   //Level 2
   else if ((collision_front == false) && (collision_back == true) && (direction == 1)) {
     emergency_local = 2;
     digitalWrite(PIN_EM_OUT, LOW);
+
   }
   //Level 3
   else if ((collision_front == true) && (collision_back == false)) {
     emergency_local = 3;
-    speed_send(false); 			//brake
+    speed_send(false);       //brake
     digitalWrite(PIN_EM_OUT, HIGH);
   }
   //Level 4
   else if ((collision_front == false) && (collision_back == true)) {
     emergency_local = 4;
-    speed_send(false); 			//brake
+    speed_send(false);       //brake
     digitalWrite(PIN_EM_OUT, HIGH);
   }
   //Level 5
   else if ((collision_front == true) && (collision_back == true)) {
     emergency_local = 5;
-    speed_send(false);			//brake
+    speed_send(false);       //brake
     digitalWrite(PIN_EM_OUT, HIGH);
   }
 
@@ -250,32 +255,7 @@ void emergency_local_check() {
 
 
 
-//LCD
 
-void update_lcd() {
-    if(booting == true){
-    	Serial1.write(0xfe);
-    	Serial1.write(boot_status);
-    }
-    else{
-    	if ((emergency_local > 2) || (emergency_COMM == true)){
-    		Serial1.write(0xfd);
-    		if (emergency_COMM == true){
-    			Serial1.write(6);
-    		}
-    		else{
-    			Serial1.write(emergency_local);
-    		}
-    	}
-    	else{
-    		Serial1.write(0xfc);
-    		Serial1.write(current_location);
-    		Serial1.write(byte(speed_raw / 4));    		
-    	}
-    }
-   
-  
-}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// I2C & INTERRUPT FUNCTIONS///////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,14 +268,11 @@ void i2c_receive(int bytes_received) {
     speed_COMM_raw = (int) Wire.read();
     current_location = (byte) Wire.read();
   }
-
-  else if (Wire.available() == 2) {
-    direction = (byte) Wire.read();
-    speed_COMM_raw = (int) Wire.read();
-    terminal = 0;
+  else if (Wire.available() > 3){
+    while(Wire.available() > 0){
+      Wire.read();
+    }
   }
-
-
   if (speed_COMM_raw == 0) {
     direction = 2;
   }
@@ -317,17 +294,18 @@ void emergency_COMM_isr() {
 ////////////////////////////////////////// MAIN SETUP /////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+  SoftwareSerial lcd (A2,1);
 
 void setup() {
 
   //Input / output behavior of pins
 
+  for (byte i = 0; i < AMOUNT_UNUSED_PINS; i++) {  //define unused pins as input
+    pinMode(UNUSED_PINS[i], INPUT);
+  }
+
   pinMode(PIN_SPEED, INPUT);
   pinMode(PIN_COLLISION, INPUT);
-
-  pinMode(PIN_EM_OUT, OUTPUT);
-  pinMode(PIN_EM_IN, INPUT);
-  digitalWrite(PIN_EM_OUT, LOW);
 
   pinMode(PIN_MOTOR_V, OUTPUT);
   pinMode(PIN_MOTOR_A, OUTPUT);
@@ -335,19 +313,27 @@ void setup() {
   digitalWrite(PIN_MOTOR_V, LOW); 		//make sure engines are off
   digitalWrite(PIN_MOTOR_A, LOW);
 
-  for (byte i = 0; i < AMOUNT_UNUSED_PINS; i++) {	//define unused pins as input
-    pinMode(UNUSED_PINS[i], INPUT);
-  }
-
   //I2C Communication
   Wire.begin(I2C_ADDRESS);      			//join i2c bus with address #2
   Wire.onReceive(i2c_receive); 			//read message from COMM
 
   //Attach emergency interrupt (emergency from COMM)
-  //attachInterrupt(digitalPinToInterrupt(PIN_EM_IN), emergency_COMM_isr, RISING);
-
-  Serial1.begin(19200); 				//Communication with LCD
-  delay(2000);					//Boot time
+  attachInterrupt(digitalPinToInterrupt(PIN_EM_IN), emergency_COMM_isr, RISING);
+  lcd.begin(19200); 				//Communication with LCD
+  
+  pinMode(PIN_EM_OUT, OUTPUT);
+  pinMode(PIN_EM_IN, INPUT);
+  digitalWrite(PIN_EM_OUT, LOW);
+  
+  boot_status = 0;
+  update_lcd();
+  delay(3000);
+  boot_status = 1;
+  update_lcd();
+  delay(3000);
+  boot_status = 2;
+  update_lcd();
+  delay(4000);					//Boot time
   booting = false;
 }
 
@@ -359,16 +345,16 @@ void loop() {
 
   update_sensors();
   emergency_local_check();
-
   if ((emergency_local <= 2) && (emergency_COMM == false)) {
     //speed_pwm = speed_COMM_raw; 		//testing purposes
     speed_calc();
     speed_send();
   }
 
+
   update_lcd();
   delay(20);
-  	/*						//stay in loop while COMM is in emergency mode
+  							//stay in loop while COMM is in emergency mode
   	while((emergency_COMM == true) || (digitalRead(PIN_EM_IN) == HIGH)){
 
   		    speed_send(false);			    //brake
@@ -378,18 +364,37 @@ void loop() {
   	    	update_sensors();			//keep local emergency levels up to date
   	    	emergency_local_check();
 
-  	   	update_lcd();
+  	   	  update_lcd();
 
   	    	delay(100);
   	 }
   
-*/
+
 }
 
+//LCD
 
-
-
-
-
-
-
+void update_lcd() {
+    if(booting == true){
+      lcd.write(0xfe);
+      lcd.write(boot_status);
+    }
+    else{
+      if ((emergency_local > 2) || (digitalRead(PIN_EM_IN) == HIGH)){
+        lcd.write(0xfd);
+        if (digitalRead(PIN_EM_IN) == HIGH){
+          lcd.write(6);
+        }
+        else{
+          lcd.write(emergency_local);
+        }
+      }
+      else{
+        lcd.write(0xfc);
+        lcd.write(current_location);
+        lcd.write(byte(speed_raw / 4));       
+      }
+    }
+   
+  
+}
