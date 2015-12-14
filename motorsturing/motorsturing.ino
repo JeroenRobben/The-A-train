@@ -84,11 +84,10 @@ const int BOTS_REF[] = {900, 340, 200};		/*
 //OTHERS
 byte emergency_local = 0; 				//Local emergency level
 volatile bool emergency_COMM = false; 			//COMM 	emergency level
-bool debug = false;
+
 bool booting = true;
 byte boot_status = 0;
-byte current_location = 0;
-byte time_next_depart = 0;
+byte current_location = 10;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// HELPER FUNCTIONS////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,7 +333,7 @@ void setup() {
   boot_status = 2;
   update_lcd();
   delay(4000);					//Boot time
-  booting = false;
+  boot_status = 3;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -375,7 +374,7 @@ void loop() {
 //LCD
 
 void update_lcd() {
-    if(booting == true){
+    if(boot_status < 3){
       lcd.write(0xfe);
       lcd.write(boot_status);
     }

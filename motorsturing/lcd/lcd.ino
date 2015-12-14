@@ -6,14 +6,16 @@ const byte AMOUNT_UNUSED_PINS = 11;      //needed to loop through the above arra
 
 char in;  // Character received from Serial input
 
-byte status = 2; // 0= booting, 1 = emergency 2 = normal
-byte boot_status = 3;
-byte emergency_level = 6;
-byte current_location = 4;
-int speed_raw = 900;
-int speed_cm = 420;
-long time_next_depart = millis() + 15000;
-int time_till_depart = 0;
+byte status = 0; // 0= booting, 1 = emergency 2 = normal
+byte boot_status = 0;
+byte emergency_level = 0;
+byte current_location = 10;
+int speed_raw = 0;
+int speed_cm = 0;
+long time_next_depart_international = millis() + 43000;
+long time_next_depart_national = millis() + 23000;
+int time_till_depart_international = 0;
+int time_till_depart_national = 0;
 
 byte old_status = 100;
 byte old_location = 100;
@@ -32,7 +34,7 @@ LiquidCrystal lcd(2, 3, 4, 5, 6, 7, 8);
 
 void banner(char string[], byte length_string, bool show_i2c = false){
     if(show_i2c){
-        if (indicator_line > length_string - 13){
+        if (indicator_line > length_string - 14){
             indicator_line = 0;
             indicator_time = millis();
         }
@@ -112,7 +114,8 @@ void loop()
     indicator_time = millis();
     old_location = current_location;
     old_status = status;
-    time_next_depart = millis() + 20000;
+    time_next_depart_international = millis() + 43000;
+    time_next_depart_national = millis() + 23000;
   }
   indicator_line = ((millis() - indicator_time) / 500);
   switch(status){
@@ -123,7 +126,8 @@ void loop()
       emergency();
       break;
     case 2:
-      time_till_depart = (time_next_depart - millis()) / 1000;
+      time_till_depart_international = (time_next_depart_international - millis()) / 1000;
+      time_till_depart_national = (time_next_depart_national - millis()) / 1000;
       normal();
       break;
   }
@@ -153,7 +157,7 @@ void update_status()
           current_location = Serial.read();
           while(Serial.available() == 0);
           speed_raw = Serial.read() * 4;
-          speed_cm = speed_raw / 10;
+          speed_cm = ((speed_raw / 10) / 2) * 2;
           status = 2;
         }
    }
@@ -203,67 +207,97 @@ void emergency(){
 void normal(){
   lcd.setCursor(0,0);
   switch(current_location){
+    
     case 0: //Straight track
       speed_print();
       lcd.setCursor(0,1);
       lcd.print("straight track  ");
       break;
+      
+    case 1: //in national station    
+      lcd.print("National Station");
+      lcd.setCursor(0,1);
+      
+      if (time_till_depart_national >= 21){   //Doors Opening                         
+        lcd.print(" Doors opening  ");
+      }
+      
+      else if ((time_till_depart_national > 9) && (time_till_depart_national < 21)){  //Waiting for depart 2 digits
+        lcd.print("Departure in ");
+        lcd.print(time_till_depart_national);
+        lcd.print("s");
+      }
+           
+      else if ((time_till_depart_national > 2) && (time_till_depart_national <= 9)){ //Waiting for depart 1 digit
+        lcd.print("Departure in  ");
+        lcd.print(time_till_depart_national);
+        lcd.print("s");
+      }
+
+      else if ((time_till_depart_national >= 0) && (time_till_depart_national <= 2)){ //Doors closing
+        lcd.print(" Doors closing  ");
+      }
+      else{                                                                                     //Start engines
+        lcd.print("Starting engines");
+      }
+      break;
+      
+    case 2: //In international station
+      banner(international_station, 21, true);      
+      lcd.setCursor(0,1);
+      
+      if (time_till_depart_international >= 41){   //Doors Opening                         
+        lcd.print(" Doors opening  ");
+      }
+      
+      else if ((time_till_depart_international > 9) && (time_till_depart_international < 41)){  //Waiting for depart 2 digits
+        lcd.print("Departure in ");
+        lcd.print(time_till_depart_international);
+        lcd.print("s");
+      }
+           
+      else if ((time_till_depart_international > 2) && (time_till_depart_international <= 9)){ //Waiting for depart 1 digit
+        lcd.print("Departure in  ");
+        lcd.print(time_till_depart_international);
+        lcd.print("s");
+      }
+
+      else if ((time_till_depart_international >= 0) && (time_till_depart_international <= 2)){ //Doors closing
+        lcd.print(" Doors closing  ");
+      }
+      else{                                                                                     //Start engines
+        lcd.print("Starting engines");
+      }
+      break;
+      
     case 3: //Bocht
       speed_print();
       lcd.setCursor(0,1);
-      lcd.print("bend track ");
+      lcd.print("bend track      ");
       break;
-    case 7: //Arriving at international station
+      
+    case 4: //Track switch
+      speed_print();
+      lcd.setCursor(0,1);
+      lcd.print("switch track    ");
+      break;
+
+    case 7: //Arriving at terminal
       lcd.print("  Arriving at  ");
       lcd.print(indicator_i2c[indicator_i2c_counter/64]);
       lcd.setCursor(0,1);
       lcd.print("    Terminal    ");
       break;
-    case 4: //Track switch
-   speed_print();
-      lcd.setCursor(0,1);
-      lcd.print("switch track    ");
-      break;
-    case 2: //In international station
-      banner(international_station, 21, true);      
-      lcd.setCursor(0,1);
-      if (time_till_depart > 9){
-        lcd.print("Departure in ");
-        lcd.print(time_till_depart);
-        lcd.print("s");
-      }
-
-      else if (time_till_depart < 0){
-        lcd.print("Starting engines");
-      }
-      else{
-        lcd.print("Departure in  ");
-        lcd.print(time_till_depart);
-        lcd.print("s");
-      }
-      break;
-    case 1: //in national station
     
-      lcd.print("National Station");
+
+    case 9://Departing from terminal
+      speed_print();
       lcd.setCursor(0,1);
-      if (time_till_depart > 9){
-        lcd.print("Departure in ");
-        lcd.print(time_till_depart);
-        lcd.print("s");
-      }
-      else if (time_till_depart < 0){
-        lcd.print("starting engines");
-      }
-      else{
-        lcd.print("Departure in  ");
-        lcd.print(time_till_depart);
-        lcd.print("s");
-      }
-      break;
-  
-    }
+      lcd.print("   Departing    ");
+
+    case 10://Never received I2C message
+      speed_print();
+      lcd.setCursor(0,1);
+      lcd.print("Waiting for COMM");
+  }
 }
-
-
-
-
