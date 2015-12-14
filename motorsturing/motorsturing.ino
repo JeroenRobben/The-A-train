@@ -286,7 +286,7 @@ void i2c_receive(int bytes_received) {
   if (Wire.available() == 3) {
     direction = (byte) Wire.read();
     speed_COMM_raw = (int) Wire.read();
-    terminal = (byte) Wire.read();
+    current_location = (byte) Wire.read();
   }
 
   else if (Wire.available() == 2) {

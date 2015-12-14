@@ -208,24 +208,23 @@ void normal(){
       lcd.setCursor(0,1);
       lcd.print("straight track  ");
       break;
-    case 1: //Bocht
+    case 3: //Bocht
       speed_print();
       lcd.setCursor(0,1);
       lcd.print("bend track ");
       break;
-    case 2: //Arriving at international station
+    case 7: //Arriving at international station
       lcd.print("  Arriving at  ");
       lcd.print(indicator_i2c[indicator_i2c_counter/64]);
       lcd.setCursor(0,1);
-      banner(international_station, 21);
+      lcd.print("    Terminal    ");
       break;
-    case 3: //Arriving at national station
-      lcd.print("  Arriving at  ");
-      lcd.print(indicator_i2c[indicator_i2c_counter/64]);
+    case 4: //Track switch
+ 	speed_print();
       lcd.setCursor(0,1);
-      lcd.print("National Station ");
+      lcd.print("switch track    ");
       break;
-    case 4: //In international station
+    case 2: //In international station
       banner(international_station, 21, true);      
       lcd.setCursor(0,1);
       if (time_till_depart > 9){
@@ -243,7 +242,7 @@ void normal(){
         lcd.print("s");
       }
       break;
-    case 5: //in national station
+    case 1: //in national station
     
       lcd.print("National Station");
       lcd.setCursor(0,1);
