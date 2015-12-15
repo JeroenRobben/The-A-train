@@ -45,6 +45,9 @@ const byte PIN_EM_IN = 7;
 
 //LCD
 const byte PIN_LCD = 1;
+SoftwareSerial lcd (A2,PIN_LCD);
+
+
 //Unused Pins, will be flagged as INPUT
 const byte UNUSED_PINS[] = {A0, A1, A2, A5, 4, 6, 8, 10, 11, 12, 13};
 const byte AMOUNT_UNUSED_PINS = 11;			//needed to loop through the above array
@@ -292,9 +295,6 @@ void emergency_COMM_isr() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// MAIN SETUP /////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  SoftwareSerial lcd (A2,1);
-
 void setup() {
 
   //Input / output behavior of pins
@@ -345,7 +345,6 @@ void loop() {
   update_sensors();
   emergency_local_check();
   if ((emergency_local <= 2) && (emergency_COMM == false)) {
-    //speed_pwm = speed_COMM_raw; 		//testing purposes
     speed_calc();
     speed_send();
   }
