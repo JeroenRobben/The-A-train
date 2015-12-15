@@ -23,11 +23,11 @@ int indicator_line = 0;
 long indicator_time = 0;
 byte indicator_i2c_counter = 0;
 const char indicator_i2c[] = {char(124), char(47), char(45), char(96)};
-char international_station[] = "International Station"; //21 characters
-char initiating_self_checks[] = "Initiating self checks"; //22 characters
-char initiated_by_central_command[] = "Initiated by central command"; //28
-char object_detected_at_front[] = "Object detected at front"; //24
-char object_detected_at_back[] = "Object detected at back"; //23
+char international_station[] = " International Station"; //21 characters
+char initiating_self_checks[] = " Initiating self checks"; //22 characters
+char initiated_by_central_command[] = " Initiated by central command"; //28
+char object_detected_at_front[] = " Object detected at front"; //24
+char object_detected_at_back[] = " Object detected at back"; //23
 
 // initialize the LCD at pins defined above
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7, 8);
@@ -69,13 +69,14 @@ void banner(char string[], byte length_string, bool show_i2c = false){
 }
 
 void speed_print(){
+  lcd.print(" ");
   lcd.print("Speed: ");
   if (speed_cm < 10){
       lcd.print(" ");
   }
   lcd.print(speed_cm);
   lcd.print("cm/s");
-  lcd.print("  ");
+  lcd.print(" ");
   lcd.print(indicator_i2c[indicator_i2c_counter/64]);
 }
 
@@ -170,7 +171,7 @@ void boot(){
   lcd.setCursor(0,1);
   switch(boot_status){
     case 0:
-      banner(initiating_self_checks, 22);
+      banner(initiating_self_checks, 23);
       break;
     case 1:
       lcd.print("Self check 1 / 2");
@@ -191,13 +192,13 @@ void emergency(){
   lcd.setCursor(0,1);
   switch(emergency_level){
     case 6:
-      banner(initiated_by_central_command,28);
+      banner(initiated_by_central_command,29);
       break;
     case 3:
-      banner(object_detected_at_front,24);
+      banner(object_detected_at_front,25);
       break;
     case 4:
-      banner(object_detected_at_back,23);
+      banner(object_detected_at_back,24);
       break;
     case 5:
       lcd.print("We're surrounded");
@@ -211,7 +212,7 @@ void normal(){
     case 0: //Straight track
       speed_print();
       lcd.setCursor(0,1);
-      lcd.print("straight track  ");
+      lcd.print(" straight track ");
       break;
       
     case 1: //in national station    
@@ -243,7 +244,7 @@ void normal(){
       break;
       
     case 2: //In international station
-      banner(international_station, 21, true);      
+      banner(international_station, 22, true);      
       lcd.setCursor(0,1);
       
       if (time_till_depart_international >= 41){   //Doors Opening                         
@@ -273,13 +274,13 @@ void normal(){
     case 3: //Bocht
       speed_print();
       lcd.setCursor(0,1);
-      lcd.print("bend track      ");
+      lcd.print("   bend track   ");
       break;
       
     case 4: //Track switch
       speed_print();
       lcd.setCursor(0,1);
-      lcd.print("switch track    ");
+      lcd.print("  switch track  ");
       break;
 
     case 7: //Arriving at terminal
@@ -290,10 +291,11 @@ void normal(){
       break;
     
 
-    case 9://Departing from terminal
+    case 9: //Track switch
       speed_print();
       lcd.setCursor(0,1);
       lcd.print("   Departing    ");
+      break;
 
     case 10://Never received I2C message
       speed_print();
