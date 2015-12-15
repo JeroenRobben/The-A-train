@@ -4,6 +4,7 @@
 
 from visual import *
 from visual.graph import *
+import urllib2
 
 RADIUS = 110.           # radius in cm
 STRAIGHT = 250.         # straight track length in cm
@@ -13,8 +14,8 @@ TERMINAL_RICO = 0.5     # rico of the track between the switch and terminal in c
 FRAMERATE = 25                # frames per second
 
 # =================================== Control Variables =========================================================
-TrainAPosX = 0
-TrainAPosZ = 0
+TrainAPosx = 50
+TrainAPosZ = 30
 TrainADuplicateVisible = False
 TrainADuplicatePosX = 0
 TrainADuplicatePosZ = 0
@@ -24,7 +25,7 @@ TrainADuplicatePosZ = 0
 
 class TheATrain:
     def __init__(self):
-
+	print("test")	
         self.Beacons = dict()
         self.Trains = dict()
         self.Locations = dict()
@@ -36,12 +37,24 @@ class TheATrain:
         self.FrameRate = FRAMERATE
 
     def mainloop(self):
-        rate(self.FrameRate)
+	while True:
+		rate(self.FrameRate)
 
-        #update control variables
-        self.Trains["TrainA"].pos = (TrainAPosX, 0, TrainAPosZ)
-        self.Trains["TrainA"].Duplicate.visible = TrainADuplicateVisible
-        self.Trains["TrainA"].Duplicate.pos = (TrainADuplicatePosX, 0, TrainADuplicatePosZ)
+		#update control variables
+
+		TrainAPosx = float(urllib2.urlopen("http://84.193.44.121/api/TrainAPosX").read().rstrip('\n'))
+		TrainAPosZ = float(urllib2.urlopen("http://84.193.44.121/api/TrainAPosZ").read().rstrip('\n'))
+		if (("False") == urllib2.urlopen("http://84.193.44.121/api/TrainADuplicateVisible").read().rstrip('\n')):
+			TrainADuplicateVisible = False
+		else:
+			TrainADuplicateVisible = True
+
+		TrainADuplicatePosX = float(urllib2.urlopen("http://84.193.44.121/api/TrainADuplicatePosX").read().rstrip('\n'))
+		TrainADuplicatePosZ = float(urllib2.urlopen("http://84.193.44.121/api/TrainADuplicatePosZ").read().rstrip('\n'))
+		print(TrainAPosx)
+		self.Trains["TrainA"].pos = (TrainAPosx, 0, TrainAPosZ)
+		self.Trains["TrainA"].Duplicate.visible = TrainADuplicateVisible
+		self.Trains["TrainA"].Duplicate.pos = (TrainADuplicatePosX, 0, TrainADuplicatePosZ)
 
 
     def set_mainwindow(self):
@@ -196,4 +209,6 @@ class switch(sphere):
 
 print "Starting TheATrain..."
 theATrain = TheATrain()
+theATrain.mainloop()
 print "Finished"
+
