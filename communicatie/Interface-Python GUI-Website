@@ -6,8 +6,8 @@ from visual import *
 from visual.graph import *
 import urllib2
 
-RADIUS = 110.           # radius in cm
-STRAIGHT = 250.         # straight track length in cm
+RADIUS = 116.           # radius in cm
+STRAIGHT = 240.         # straight track length in cm
 TERMINAL_LENGTH = 120.  # length of the track between the switch and terminal in cm
 TERMINAL_RICO = 0.5     # rico of the track between the switch and terminal in cm
 
