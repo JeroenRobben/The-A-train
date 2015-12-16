@@ -6,9 +6,9 @@ from visual import *
 from visual.graph import *
 import urllib2
 
-RADIUS = 116.           # radius in cm
-STRAIGHT = 240.         # straight track length in cm
-TERMINAL_LENGTH = 120.  # length of the track between the switch and terminal in cm
+RADIUS = 125.           # radius in cm
+STRAIGHT = 320.         # straight track length in cm
+TERMINAL_LENGTH = 130.  # length of the track between the switch and terminal in cm
 TERMINAL_RICO = 0.5     # rico of the track between the switch and terminal in cm
 
 FRAMERATE = 25                # frames per second
@@ -131,21 +131,21 @@ class TheATrain:
 
         self.add_beacon(location=self.Locations["Ellipse"], ID="b0", number=0, type=0, index=0,
                         surroundingBeaconIDs={"b1", "b11"}, visible=False)
-        self.add_beacon(self.Locations["Ellipse"], "b1", 4, 5, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - 50, {"b2", "b11"})
-        self.add_beacon(self.Locations["Ellipse"], "b2", 9, 4, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] + 50, {"b5", "b1", "b3"})
+        self.add_beacon(self.Locations["Ellipse"], "b1", 4, 5, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] - 135, {"b2", "b11"})
+        self.add_beacon(self.Locations["Ellipse"], "b2", 9, 4, self.Switches["SwitchRight"].LocationIndex[self.Locations["Ellipse"]] + 100, {"b5", "b1", "b3"})
         self.add_beacon(self.Locations["RightTerminal"], "b3", 6, 6, 50, {"b4", "b2"})
         self.add_beacon(self.Locations["RightTerminal"], "b4", 8, 1, len(self.Locations["RightTerminal"].x)-1, {"b3"})
-        self.add_beacon(self.Locations["Ellipse"], "b5", 5, 4, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] - 50, {"b6", "b7", "b2"})
-        self.add_beacon(self.Locations["Ellipse"], "b6", 3, 5, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] + 50, {"b9", "b5"})
+        self.add_beacon(self.Locations["Ellipse"], "b5", 5, 4, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] - 100, {"b6", "b7", "b2"})
+        self.add_beacon(self.Locations["Ellipse"], "b6", 3, 5, self.Switches["SwitchLeft"].LocationIndex[self.Locations["Ellipse"]] + 150, {"b9", "b5"})
         self.add_beacon(self.Locations["LeftTerminal"], "b7", 6, 6, 50, {"b8", "b5"})
         self.add_beacon(self.Locations["LeftTerminal"], "b8", 7, 1, len(self.Locations["LeftTerminal"].x)-1, {"b7"})
         for index in arange(len(self.Locations["Ellipse"].z)/2, len(self.Locations["Ellipse"].z)):
             if self.Locations["Ellipse"].z[index] == -self.Radius - 50:
                 test = index
                 break
-        self.add_beacon(self.Locations["Ellipse"], "b9", 2, 9, test + 50, {"b6", "b10"})
+        self.add_beacon(self.Locations["Ellipse"], "b9", 2, 9, test + 20, {"b6", "b10"})
         self.add_beacon(self.Locations["Ellipse"], "b10", 1, 2, test + self.Straight/2, {"b9", "b11"})
-        self.add_beacon(self.Locations["Ellipse"], "b11", 2, 9, test + self.Straight - 50, {"b10", "b1"})
+        self.add_beacon(self.Locations["Ellipse"], "b11", 2, 9, test + self.Straight - 20, {"b10", "b1"})
 
         self.add_train(ID="TrainA", location=self.Locations["Ellipse"], lastBeacon=self.Beacons["b0"],
                        previousLastBeacon=self.Beacons["b0"], nextBeacons={self.Beacons["b1"], self.Beacons["b11"]},
